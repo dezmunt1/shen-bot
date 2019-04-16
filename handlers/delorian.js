@@ -61,8 +61,12 @@ module.exports = (ctx, bot) => {
                 pess['chat_id'] = ctx.chat.id;
                 pess['message_id'] = ctx.message.message_id;
                 ctx.deleteMessage(pess.message_id)
+                    .then(()=> {
+                        ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, 'Неверный формат, ОК для продолжения', Markup.inlineKeyboard([
+                            Markup.callbackButton('ОК', 'back')]).extra())
+                    })
                 .catch(err => console.log(err));
-                ctx.wizard.selectStep(1);
+                return ctx.wizard.back();
                 
             } else {
                 ctx.reply('Done');
@@ -75,14 +79,12 @@ module.exports = (ctx, bot) => {
         });
     
     const stage = new Stage();
-    stage.register(delorWizard);
     bot.use(session());
+    stage.register(delorWizard);
     bot.use(stage.middleware());
 
     bot.action('sendFuture', (ctx) => ctx.scene.enter('delorWizard'));
-    bot.action('leaveWizard', (ctx) => {
-        mess = {};
-        pess = {};
-        return ctx.scene.leave();
+    bot.action('back', (ctx) => {
+        return null;
     });
 };
