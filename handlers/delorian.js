@@ -1,12 +1,33 @@
 const Markup = require('telegraf/markup');
-const Extra = require('telegraf/extra');
-const WizardScene = require('telegraf/scenes/wizard');
 const Stage = require('telegraf/stage');
 const session = require('telegraf/session');
 const Composer = require('telegraf/composer');
+const Scene = require('telegraf/scenes/base');
 
 let mess = {};
 let pess = {};
+
+function correctTime(date) {
+    // 22.11.1991 в 22.00
+    let abc = date.split('в')
+                .map(elem => {
+                    return elem.split('.')
+                });
+    abc = abc[0].concat(abc[1]);
+    console.log(abc)
+
+    let presentTime = new Date();
+    let futureTime = new Date(abc[2], +abc[1]-1, abc[0], abc[3], abc[4]);
+    console.log(futureTime, presentTime);
+    if (futureTime < presentTime) {
+        return false
+    } else {
+        return futureTime;
+    }
+
+}
+
+correctTime('22.11.1991 в 22.00');
 
 
 module.exports = (ctx, bot) => {
@@ -21,70 +42,59 @@ module.exports = (ctx, bot) => {
         })
         .catch(err => console.log(err));
     
-
-    const delorWizard = new WizardScene('delorWizard', (ctx, next) => {
-        if (!mess.unperformed) {
-            ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, 'Введите отправляемый текст', Markup.inlineKeyboard([
-                Markup.callbackButton('🔙 Назад', 'leaveWizard')]).extra())
+    const sendFutureScene = new Scene('sendFuture');
+    sendFutureScene.enter(ctx => {
+        ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, 'Введите отправляемый текст', Markup.inlineKeyboard([
+                Markup.callbackButton('Выйти', 'exitScene')]).extra())
                     .then(ctx_then =>{
                         mess['chat_id'] = ctx_then.chat.id;
                         mess['message_id'] = ctx_then.message_id;
-                        mess['unperformed'] = 1;
                         console.log(mess);
-                        return ctx.wizard.next();
                     })
-                    .catch(err => console.log(err));
+                }
+    );
+    sendFutureScene.on('text', ctx => {
+        if(!ctx.message.text.match(/\d{1,2}\.\d{1,2}\.\d{4}\sв\s\d{1,2}\.\d{1,2}/g)) {
+            ctx.deleteMessage(ctx.message.message_id)
+                .then((aaa)=> {
+                    ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, 'Должна быть запись в формате ДД.ММ.ГГГГ в ЧЧ.ММ', Markup.inlineKeyboard([
+                        Markup.callbackButton('Выйти', 'exitScene')]).extra())
+                        .then(ctx_then => {
+                            mess['chat_id'] = ctx_then.chat.id;
+                            mess['message_id'] = ctx_then.message_id;
+                            mess['text'] = ctx_then.text;
+                        })
+                        .catch(err =>{
+                            if (err.on.payload.text === mess.text) { // если сообщение не изменялось
+                                console.log('Текс не изменялся');
+                            }
+                        })
+            });
         } else {
-            ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, 'Должна быть запись в формате ДД.ММ.ГГГГ в ЧЧ.ММ', Markup.inlineKeyboard([
-                Markup.callbackButton('🔙 Назад', 'leaveWizard')]).extra())
+            ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, 'Все отлично')
                     .then(ctx_then =>{
+                        let time = correctTime(ctx.message.text);
+                        console.log(time);
+                        if (time) ctx.reply(`Вам напомнят ${time}`);
                         mess['chat_id'] = ctx_then.chat.id;
                         mess['message_id'] = ctx_then.message_id;
-                        mess['unperformed'] = 1;
-                        mess['text'] = ctx_then.text;
-                        return ctx.wizard.next();
+                        console.log('Exiting');
+                        ctx.scene.leave();
                     })
-                    .catch(err => {
-                        if (err.on.payload.text === mess.text) {
-                            return ctx.wizard.next();
-                        }
-                    });
-                    
-        };
-        console.log('Сцена 1', ctx);
+        }
+    });
+    
 
-    },
-        (ctx) =>{
-            console.log('Сцена 2');
-            console.log('im here', ctx);
-            if(!ctx.message.text.match(/\d{1,2}\.\d{1,2}\.\d{4}\sв\s\d{1,2}\.\d{1,2}/g)){
-                pess['chat_id'] = ctx.chat.id;
-                pess['message_id'] = ctx.message.message_id;
-                ctx.deleteMessage(pess.message_id)
-                    .then(()=> {
-                        ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, 'Неверный формат, ОК для продолжения', Markup.inlineKeyboard([
-                            Markup.callbackButton('ОК', 'back')]).extra())
-                    })
-                .catch(err => console.log(err));
-                return ctx.wizard.back();
-                
-            } else {
-                ctx.reply('Done');
-                mess = {};
-                pess = {};
-                return ctx.scene.leave();
-            };
-            console.log(ctx.message.text.match(/\d{1,2}\.\d{1,2}\.\d{4}\sв\s\d{1,2}\.\d{1,2}/g));
-            
-        });
+    
     
     const stage = new Stage();
     bot.use(session());
-    stage.register(delorWizard);
+    stage.register(sendFutureScene);
     bot.use(stage.middleware());
 
-    bot.action('sendFuture', (ctx) => ctx.scene.enter('delorWizard'));
-    bot.action('back', (ctx) => {
-        return null;
+    bot.action('sendFuture', (ctx) => {ctx.scene.enter('sendFuture')});
+    bot.action('exitScene', (ctx) => {
+        console.log('Exit');
+        ctx.scene.leave();
     });
 };
