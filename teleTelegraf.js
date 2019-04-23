@@ -6,7 +6,7 @@ require('dotenv').config();
 const {etiquette, weatherApp, xakepNews, delorian} = require('./handlers');
 
 
-mongoose.connect('mongodb://localhost:27017/delorian', {useNewUrlParser: true});
+mongoose.connect(`${process.env.MONGODB_URI}/delorian`, {useNewUrlParser: true});
 const db = mongoose.connection;
 db.on('error', console.error.bind(console, 'connection error:')); 
 db.once('open', console.log.bind(console, 'Соединение установлено')); 
