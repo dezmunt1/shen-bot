@@ -18,7 +18,6 @@ function correctTime(date) {
 }
 
 const formatDate = (date) => {
-    if(!date.getHours()) return false;
     const editedDate = {
         year: date.getFullYear(),
         month: date.getMonth() + 1,

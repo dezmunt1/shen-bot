@@ -9,4 +9,10 @@ const delorianSchema = new mongoose.Schema({
     performed: Boolean
 });
 
-module.exports = {delorianSchema,};
+delorianSchema.methods.speak = function() {
+    console.log(Object.keys(this));
+};
+
+const DelorianModel = mongoose.model('DelorianModel', delorianSchema);
+
+module.exports = {DelorianModel,};

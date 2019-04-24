@@ -1,6 +1,7 @@
 const Telegraf = require('telegraf');
 const mongoose = require('mongoose');
 const session = require('telegraf/session');
+const {dlMongoListener} = require('./handlers/delorian/mongoListener');
 
 require('dotenv').config();
 const {etiquette, weatherApp, xakepNews, delorian} = require('./handlers');
@@ -33,6 +34,7 @@ bot.hears(/(п|П)огода [а-яА-Яa-zA-Z-]+/, weatherApp );
 bot.command('delorian', (ctx)=> {
   delorian(ctx, bot);
 });
+dlMongoListener(bot);
 
 bot.catch((err) => {console.log('Ooops', err)});
 

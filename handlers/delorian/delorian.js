@@ -1,17 +1,11 @@
 const Markup = require('telegraf/markup');
 const Stage = require('telegraf/stage');
-const {correctTime, formatDate} = require('../utils/dateTransform');
+const {correctTime, formatDate} = require('../../utils/dateTransform');
 const Composer = require('telegraf/composer');
 const Scene = require('telegraf/scenes/base');
 const mongoose = require('mongoose');
-const {delorianSchema} = require('../models/schemas');
+const {DelorianModel} = require('../../models/schemas');
 
-delorianSchema.methods.speak = function() {
-    console.log(Object.keys(this));
-};
-
-const DelorianModel = mongoose.model('DelorianModel', delorianSchema);
-let futureMessage; 
 
 let mess = {};
 
@@ -102,7 +96,7 @@ module.exports = (ctx, bot) => {
     enteringText.on('text', ctx => {
         ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, 'Увидимся в будущем')
             .then(ctx_then => {
-            futureMessage = new DelorianModel( {
+            let futureMessage = new DelorianModel( {
                     chatId: ctx.chat.id,
                     userId: 123,
                     messageId: ctx.message.message_id,
@@ -128,21 +122,4 @@ module.exports = (ctx, bot) => {
         console.log('Exit');
         ctx.scene.leave();
     });
-    setInterval(sss => {
-        let nowDate = formatDate(new Date());
-        nowDate = `${nowDate.date}.${nowDate.month}.${nowDate.year} ${nowDate.hours}.${nowDate.min}`;
-        DelorianModel.findOne({remindTime: nowDate},(err, res) =>{
-            if(err) return;
-            try {
-                if(!res.performed) {
-                    ctx.telegram.sendMessage(res.chatId, res.text);
-                    res.performed = true;
-                    res.save((err)=>{
-                        if (err) console.error(err);
-                    })
-                }
-                console.log(res.text)
-            } catch {};
-        });
-    }, 1000)
 };
