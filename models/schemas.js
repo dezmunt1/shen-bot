@@ -9,10 +9,17 @@ const delorianSchema = new mongoose.Schema({
     performed: Boolean
 });
 
-delorianSchema.methods.speak = function() {
-    console.log(Object.keys(this));
-};
+const respectSchema = new mongoose.Schema({
+    cbId: Number,
+    chatId: String,
+    userId: Number,
+    messageId: Number,
+    text: String,
+    like: Number,
+    dislike: Number
+});
 
 const DelorianModel = mongoose.model('DelorianModel', delorianSchema);
+const RespectModel = mongoose.model('RespectModel', respectSchema);
 
-module.exports = {DelorianModel,};
+module.exports = {DelorianModel, RespectModel};

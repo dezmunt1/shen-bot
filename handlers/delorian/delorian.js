@@ -1,29 +1,28 @@
 const Markup = require('telegraf/markup');
 const Stage = require('telegraf/stage');
 const {correctTime, formatDate} = require('../../utils/dateTransform');
-const Composer = require('telegraf/composer');
 const Scene = require('telegraf/scenes/base');
-const mongoose = require('mongoose');
 const {DelorianModel} = require('../../models/schemas');
-
+const {customScenes} = require('../../actions');
+const Composer = require('telegraf/composer');
 
 let mess = {};
-
-
-module.exports = (ctx, bot) => {
-    
-    ctx.reply('Добро пожаловать в Delogrian, чем могу быть полезен?', Markup.inlineKeyboard([
-        Markup.callbackButton('🚀 Отправить в будущее', 'sendFuture'),
-        Markup.callbackButton('🔭 Посмотреть в будущее', 'watchFuture'),
-        Markup.callbackButton('🔙 Вернуть из будущего', 'backFuture')
+const replys = (ctx) => {
+    ctx.deleteMessage(ctx.message.message_id);
+    ctx.reply('Добро пожаловать в Delorian, чем могу быть полезен?', Markup.inlineKeyboard([
+        Markup.callbackButton('🚀 Отправить в будущее', 'sendFuture')
     ]).extra())
         .then(ctx_then =>{
             mess['chat_id'] = ctx_then.chat.id;
             mess['message_id'] = ctx_then.message_id;
         })
         .catch(err => console.log(err));
-    
-    const sendFutureScene = new Scene('sendFuture');
+    return new Promise((res,rej)=>{
+        res(ctx);
+    })
+};
+
+const sendFutureScene = new Scene('sendFuture');
     sendFutureScene.enter(ctx => {
         ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, 'Введите дату отправления', Markup.inlineKeyboard([
                 Markup.callbackButton('Выйти', 'exitScene')]).extra())
@@ -54,15 +53,11 @@ module.exports = (ctx, bot) => {
         } else {
             let time = correctTime(ctx.message.text);
             if (time) {
-                ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, 'Все отлично, теперь введите сообщение')
-                    .then(ctx_then =>{
-                        let date = formatDate(time); // Запишем в формат ДД.ММ.ГГГГ ЧЧ.ММ
-                        mess['time'] = `${date.date}.${date.month}.${date.year} ${date.hours}.${date.min}`;
-                        ctx.scene.enter('enteringText');     //Вход в сцену ВВОДА ТЕКСТА
-                        
-                        console.log('Exiting Scene 1');
-                        ctx.scene.leave();
-                    })
+                let date = formatDate(time); // Запишем в формат ДД.ММ.ГГГГ ЧЧ.ММ
+                mess['time'] = `${date.date}.${date.month}.${date.year} ${date.hours}.${date.min}`;
+                ctx.scene.enter('enteringText');     //Вход в сцену ВВОДА ТЕКСТА
+                console.log('Exiting Scene 1');
+                ctx.scene.leave();
             } else {
                 ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, 'В прошлое сообщений я не отправляю. Чтобы попробовать еще раз, введите `/delorian`')
                     .then(ctx_then => {
@@ -82,44 +77,42 @@ module.exports = (ctx, bot) => {
         }
     });
 
-    const enteringText = new Scene('enteringText');
-    enteringText.enter(ctx => {
-        ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, 'Введите отправляемый текст', Markup.inlineKeyboard([
-                Markup.callbackButton('Выйти', 'exitScene')]).extra())
-                    .then(ctx_then =>{
-                        mess['chat_id'] = ctx_then.chat.id;
-                        mess['message_id'] = ctx_then.message_id;
-                        console.log(mess);
-                    })
-                }
-    );
-    enteringText.on('text', ctx => {
-        ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, 'Увидимся в будущем')
-            .then(ctx_then => {
-            let futureMessage = new DelorianModel( {
-                    chatId: ctx.chat.id,
-                    userId: 123,
-                    messageId: ctx.message.message_id,
-                    remindTime: mess.time,
-                    text: ctx.message.text,
-                    performed: false
-                });
-                futureMessage.save((err, futureMessage)=>{
-                    if (err) console.error(err);
+const enteringText = new Scene('enteringText');
+enteringText.enter(ctx => {
+    ctx.deleteMessage(ctx.message.message_id);
+    ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, 'Введите отправляемый текст', Markup.inlineKeyboard([
+            Markup.callbackButton('Выйти', 'exitScene')]).extra())
+                .then(ctx_then =>{
+                    mess['chat_id'] = ctx_then.chat.id;
+                    mess['message_id'] = ctx_then.message_id;
+                    console.log(mess);
                 })
-                console.log('Exiting Scene 2');
-                ctx.scene.leave();
+            }
+);
+enteringText.on('text', ctx => {
+    ctx.deleteMessage(ctx.message.message_id);
+    ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, 'Увидимся в будущем')
+        .then(ctx_then => {
+        let futureMessage = new DelorianModel( {
+                chatId: ctx.chat.id,
+                userId: 123,
+                messageId: ctx.message.message_id,
+                remindTime: mess.time,
+                text: ctx.message.text,
+                performed: false
+            });
+            futureMessage.save((err, futureMessage)=>{
+                if (err) console.error(err);
             })
-        }
-    );    
-    
-    const stage = new Stage();
-    stage.register(sendFutureScene, enteringText);
-    bot.use(stage.middleware());
+            console.log('Exiting Scene 2');
+            ctx.scene.leave();
+        })
+    }
+);    
 
-    bot.action('sendFuture', (ctx) => {ctx.scene.enter('sendFuture')});
-    bot.action('exitScene', (ctx) => {
-        console.log('Exit');
-        ctx.scene.leave();
-    });
+
+module.exports = {
+    sendFutureScene,
+    enteringText,
+    replys
 };

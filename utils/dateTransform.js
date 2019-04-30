@@ -22,7 +22,7 @@ const formatDate = (date) => {
         year: date.getFullYear(),
         month: date.getMonth() + 1,
         date: date.getDate(),
-        hours: date.getMonth(),
+        hours: date.getHours(),
         min: date.getMinutes(),
     }
     return editedDate;
