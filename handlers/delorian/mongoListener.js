@@ -17,19 +17,18 @@ const dlMongoListener = function(ctx){
                         if (err) console.error(err);
                     })
                 }
-            } catch {};
+            } catch(e) {};
         });
     }, 1000);
 };
 
 const respectMongoListener = function(ctx) {
-    console.log('zzzzzzz');
     let thisChatId = ctx.chat.id;                          // данные при текущем нажатии на кнопку
     let thisMessId = ctx.callbackQuery.message.message_id;
     let rate = ctx.callbackQuery.data; // Данные кнопки
     if(rate == 'like' || rate == 'dislike') {
         RespectModel.findOne({chatId: thisChatId, messageId: thisMessId},(err, res) =>{
-            if (err || res === null) {console.log(err); return;}
+            if (err || res === null) {console.log(err); return;} // Почему тут res ?)))
             res[rate]++;
             ctx.telegram.editMessageText(res.chatId, res.messageId, null, res.text, Markup.inlineKeyboard([
                 Markup.callbackButton(`👍 ${res.like}`, 'like'),

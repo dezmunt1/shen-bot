@@ -15,10 +15,17 @@ const callbackQuerys = new Router((ctx) => {
 });
 ;
 callbackQuerys.on('sendFuture', (ctx) => {
-    ctx.scene.enter('sendFuture');
-    console.log('Вход в сцену sendFuture');
+    try {
+        ctx.scene.enter('sendFuture');
+        console.log('Вход в сцену sendFuture');
+    } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
+        ctx.answerCbQuery('Этот опрос не актуален, введите /delorian еще раз', false);
+    };
+    
+    
 });
 callbackQuerys.on('exitScene', (ctx) => {
+    ctx.deleteMessage(ctx.callbackQuery.message.message_id);
     ctx.answerCbQuery('Ну и не надо', false);
     ctx.scene.leave();
     console.log('Выход из сцены');

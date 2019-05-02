@@ -26,10 +26,15 @@ const sendFutureScene = new Scene('sendFuture');
     sendFutureScene.enter(ctx => {
         ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, 'Введите дату отправления', Markup.inlineKeyboard([
                 Markup.callbackButton('Выйти', 'exitScene')]).extra())
-                    .then(ctx_then =>{
+                    .then(ctx_then => {
                         mess['chat_id'] = ctx_then.chat.id;
                         mess['message_id'] = ctx_then.message_id;
                         console.log(mess);
+                    })
+                    .catch(err => {
+                        if (err.code === 400) {
+                            ctx.answerCbQuery('Этот опрос не актуален, введите /delorian еще раз', false);
+                        }
                     })
                 }
     );
@@ -108,7 +113,7 @@ enteringText.on('text', ctx => {
             ctx.scene.leave();
         })
     }
-);    
+);
 
 
 module.exports = {
