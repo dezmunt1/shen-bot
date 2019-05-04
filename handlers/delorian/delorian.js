@@ -24,6 +24,7 @@ const replys = (ctx) => {
 
 const sendFutureScene = new Scene('sendFuture');
     sendFutureScene.enter(ctx => {
+        timerExit(ctx);   // если 3 минуты бездействешь, автовыход из сцены
         ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, 'Введите дату отправления', Markup.inlineKeyboard([
                 Markup.callbackButton('Выйти', 'exitScene')]).extra())
                     .then(ctx_then => {
@@ -115,6 +116,14 @@ enteringText.on('text', ctx => {
     }
 );
 
+function timerExit(ctx) {
+    const ctxSec = ctx;
+    let fiveMinutes = setTimeout(function(ctxSec){
+        ctx.scene.leave();
+        console.log('Выхожу из сцены');
+        ctx.telegram.editMessageText(ctxSec.callbackQuery.message.chat.id, ctxSec.callbackQuery.message.message_id, null, 'Вы слишком долгий, введите заново /delorian')
+    }, 1000 * 60 * 3, ctxSec);
+}
 
 module.exports = {
     sendFutureScene,
