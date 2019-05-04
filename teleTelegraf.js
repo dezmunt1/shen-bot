@@ -1,13 +1,14 @@
 const Telegraf = require('telegraf');
-const mongoose = require('mongoose');
-const session = require('telegraf/session');
-const callbackQuerys = require('./actions');
-const {dlMongoListener} = require('./handlers/delorian/mongoListener');
 const rateLimit = require('telegraf-ratelimit');
 const Stage = require('telegraf/stage');
+const session = require('telegraf/session');
+const mongoose = require('mongoose');
+const callbackQuerys = require('./actions');
+const {dlMongoListener} = require('./utils/mongoListener');
+
 
 require('dotenv').config();
-const {etiquette, weatherApp, xakepNews, delorian, respect} = require('./handlers');
+const {etiquette, weatherApp, getArticle, delorian, respect} = require('./handlers');
 
 mongoose.connect(`${process.env.MONGODB_URI}/delorian`, {useNewUrlParser: true});
 const db = mongoose.connection;
@@ -38,7 +39,7 @@ bot.use((ctx, next) => {
 bot.on('left_chat_member', etiquette);
 bot.on('new_chat_members', etiquette);
 
-bot.hears(/(с|С)татья хакер/, xakepNews);
+bot.hears(/(с|С)татья (.+)/, getArticle);
 bot.hears(/(п|П)огода [а-яА-Яa-zA-Z-]+/, weatherApp );
 
 bot.command('delorian', ctx => {

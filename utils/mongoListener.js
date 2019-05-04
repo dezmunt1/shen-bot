@@ -1,6 +1,6 @@
-const {correctTime, formatDate} = require('../../utils/dateTransform');
+const {correctTime, formatDate} = require('./dateTransform');
 const Markup = require('telegraf/markup');
-const {DelorianModel, RespectModel} = require('../../models/schemas');
+const {DelorianModel, RespectModel} = require('../models/schemas');
 
 const dlMongoListener = function(ctx){
     setInterval(() => { // лушаем delorian

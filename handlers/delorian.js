@@ -1,9 +1,9 @@
 const Markup = require('telegraf/markup');
 const Stage = require('telegraf/stage');
-const {correctTime, formatDate} = require('../../utils/dateTransform');
+const {correctTime, formatDate} = require('../utils/dateTransform');
 const Scene = require('telegraf/scenes/base');
-const {DelorianModel} = require('../../models/schemas');
-const {customScenes} = require('../../actions');
+const {DelorianModel} = require('../models/schemas');
+const {customScenes} = require('../actions');
 const Composer = require('telegraf/composer');
 
 let mess = {};
@@ -121,7 +121,8 @@ function timerExit(ctx) {
     let fiveMinutes = setTimeout(function(ctxSec){
         ctx.scene.leave();
         console.log('Выхожу из сцены');
-        ctx.telegram.editMessageText(ctxSec.callbackQuery.message.chat.id, ctxSec.callbackQuery.message.message_id, null, 'Вы слишком долгий, введите заново /delorian')
+        ctx.telegram.editMessageText(ctxSec.callbackQuery.message.chat.id, ctxSec.callbackQuery.message.message_id, null, 'Вы слишком долгий, введите заново /delorian');
+        clearTimeout(fiveMinutes);
     }, 1000 * 60 * 3, ctxSec);
 }
 
