@@ -4,7 +4,7 @@ const Stage = require('telegraf/stage');
 const session = require('telegraf/session');
 const mongoose = require('mongoose');
 const callbackQuerys = require('./actions');
-const {dlMongoListener} = require('./utils/mongoListener');
+const {dlMongoListener, articleMongoListener} = require('./utils/mongoListener');
 
 
 require('dotenv').config();
@@ -52,8 +52,15 @@ bot.command('delorian', ctx => {
 bot.hears(/\/respect (.+)/, (ctx) => {
   respect(ctx, bot);
 });
+bot.help(ctx => {
+  ctx.reply(`<b>Привет, вот что я умею братишка:</b> \n
+  1. /delorian - отправить сообщение в будущее\n
+  2. /respect [текс] - лайки и дизлайки к [тексту]\n
+  3. статья [ресурс] - для запроса свежей рандомной статьи (вбей вместо ресурса "список" или "list" - для получения перечня ресурсов)`, Telegraf.Extra.HTML(true));
+})
 
 dlMongoListener(bot);
+articleMongoListener();
 
 bot.on('callback_query', callbackQuerys);
 
