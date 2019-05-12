@@ -2,6 +2,7 @@ const Markup = require('telegraf/markup');
 const {correctTime, formatDate} = require('../utils/dateTransform');
 const Scene = require('telegraf/scenes/base');
 const {DelorianModel} = require('../models/schemas');
+const {userMongoListener} = require('../utils/mongoListener');
 
 let mess = {};
 const replys = (ctx) => {
@@ -12,6 +13,10 @@ const replys = (ctx) => {
         .then(ctx_then =>{
             mess['chat_id'] = ctx_then.chat.id;
             mess['message_id'] = ctx_then.message_id;
+            return userMongoListener(ctx);
+        })
+        .then((res) => {
+            mess['gmt'] = res.gmt;
         })
         .catch(err => console.log(err));
     return new Promise((res,rej)=>{
@@ -21,6 +26,7 @@ const replys = (ctx) => {
 
 const sendFutureScene = new Scene('sendFuture');
     sendFutureScene.enter(ctx => {
+        console.log(mess);
         timerExit(ctx);   // если 3 минуты бездействешь, автовыход из сцены
         ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, 'Введите дату отправления', Markup.inlineKeyboard([
                 Markup.callbackButton('Выйти', 'exitScene')]).extra())
@@ -54,7 +60,7 @@ const sendFutureScene = new Scene('sendFuture');
                         })
             });
         } else {
-            let time = correctTime(ctx.message.text);
+            let time = correctTime(ctx.message.text, mess.gmt);
             if (time) {
                 let date = formatDate(time); // Запишем в формат ДД.ММ.ГГГГ ЧЧ.ММ
                 mess['time'] = `${date.date}.${date.month}.${date.year} ${date.hours}.${date.min}`;

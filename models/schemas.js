@@ -1,5 +1,12 @@
 const mongoose = require('mongoose');
 
+const articleSchema = new mongoose.Schema({
+    resourse: String,
+    data: Object,
+    funcName: String,
+    date: Date
+});
+
 const delorianSchema = new mongoose.Schema({
     chatId: Number,
     userId: Number,
@@ -19,16 +26,17 @@ const respectSchema = new mongoose.Schema({
     dislike: Number
 });
 
-const articleSchema = new mongoose.Schema({
-    resourse: String,
-    data: Object,
-    funcName: String,
-    date: Date
+const userSchema = new mongoose.Schema({
+    firstName: String,
+    userName: String,
+    userId: Number,
+    gmt: {type: String, default: '3'}
 });
 
+const ArticleModel = mongoose.model('ArticleModel', articleSchema);
 const DelorianModel = mongoose.model('DelorianModel', delorianSchema);
 const RespectModel = mongoose.model('RespectModel', respectSchema);
-const ArticleModel = mongoose.model('ArticleModel', articleSchema);
+const UserModel = mongoose.model('UserModel', userSchema);
 
 
-module.exports = {DelorianModel, RespectModel, ArticleModel};
+module.exports = {DelorianModel, RespectModel, ArticleModel, UserModel};

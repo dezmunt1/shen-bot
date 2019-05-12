@@ -1,7 +1,7 @@
 const {correctTime, formatDate} = require('./dateTransform');
 const articleParser = require('../utils/articleParser');
 const Markup = require('telegraf/markup');
-const {DelorianModel, RespectModel, ArticleModel} = require('../models/schemas');
+const {DelorianModel, RespectModel, ArticleModel, UserModel} = require('../models/schemas');
 
 const dlMongoListener = function(ctx){
     setInterval(() => { // лушаем delorian
@@ -51,7 +51,7 @@ const respectMongoListener = function(ctx) {
 };
 const articleMongoListener = function(reqResourse, parser) {
     if (reqResourse) {
-         const azaza = new Promise( (resolve, rej) => {
+        const azaza = new Promise( (resolve, rej) => {
             ArticleModel.findOne({resourse: reqResourse}, (err, res) => {
                 if(err) {console.log(err); return;};
                 if (res) {
@@ -116,9 +116,45 @@ const articleMongoListener = function(reqResourse, parser) {
     }, 1000 * 60 * 60 * (Math.floor(Math.random() * (2)) + 1)) // Парсим раз в час/два 
 
 }
+const userMongoListener = function(ctx, params) {
+    const reqDB = new Promise ((resolve, rej) => {
+        UserModel.findOne({userId: ctx.from.id}, (err, res) =>{
+            if (err) {console.log(err); return;}
+            if (res) {resolve(res)};
+            if (res === null) {
+                const newUser = new UserModel({
+                    firstName: ctx.from.first_name,
+                    userName: ctx.from.username || ctx.from.first_name,
+                    userId: ctx.from.id
+                });
+                newUser.save((err)=>{
+                    if (err) console.error(err);
+                    resolve();
+                })
+            }
+        })
+    });
+    return new Promise( (resolve, rej) => {
+        reqDB
+            .then((resp) => {
+                if (resp) {
+                    resolve(resp)
+                } else {
+                    UserModel.findOne({userId: ctx.from.id}, (err, res) =>{
+                        if (err) {console.log(err); return;}
+                        resolve(res);
+                    });
+                };
+            })
+            .catch(err => {
+            rej(err);
+        }); 
+    });
+}
 
 module.exports = {
     dlMongoListener,
     respectMongoListener,
-    articleMongoListener
+    articleMongoListener,
+    userMongoListener
 };

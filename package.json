@@ -13,6 +13,7 @@
     "dotenv": "^7.0.0",
     "express": "^4.16.4",
     "lvovich": "^1.0.11",
+    "moment-timezone": "^0.5.25",
     "mongoose": "^5.4.20",
     "osmosis": "^1.1.10",
     "petrovich": "^0.2.1",
