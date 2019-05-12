@@ -97,18 +97,23 @@ const articleMongoListener = function(reqResourse, parser) {
                 let resourse = item.resourse;
                 let funcName = item.funcName
                 console.log(`Начинаю парсить "${resourse.toUpperCase()}"`);
-                articleParser[funcName]()
+                new Promise( (resolve, reject) => {
+                    const newItem = item;   // замыкание для асинхронной функции
+                    articleParser[funcName]()
                     .then( result => {
-                        item.data = result;
-                        item.date = new Date();
-                        item.save((err)=>{
+                        newItem.data = result;
+                        newItem.date = new Date();
+                        newItem.save((err)=>{
                             if (err) console.error(err);
+                            resolve();
                         })
                     })
                 
+                })
+                
             }
         });
-    }, 1000 * 60 * 60 * (Math.floor(Math.random() * (2)) + 1)) // Парсим раз в час/два
+    }, 1000 * 60 * 60 * (Math.floor(Math.random() * (2)) + 1)) // Парсим раз в час/два 
 
 }
 

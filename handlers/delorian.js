@@ -1,10 +1,7 @@
 const Markup = require('telegraf/markup');
-const Stage = require('telegraf/stage');
 const {correctTime, formatDate} = require('../utils/dateTransform');
 const Scene = require('telegraf/scenes/base');
 const {DelorianModel} = require('../models/schemas');
-const {customScenes} = require('../actions');
-const Composer = require('telegraf/composer');
 
 let mess = {};
 const replys = (ctx) => {
