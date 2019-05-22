@@ -30,13 +30,32 @@ const userSchema = new mongoose.Schema({
     firstName: String,
     userName: String,
     userId: Number,
-    gmt: {type: String, default: '3'}
+    isBot: Boolean,
+    lang: {type: String, default: 'en'},
+    gmt: {type: String, default: '+3'}
 });
 
+const chatSchema = new mongoose.Schema({
+    chatID: Number,
+    description: {type: String, default: 'Без описания'},
+    photoLogo: Object,
+    title: String,
+    chatType: String,
+    username: String,
+    maxMsgId: Number,
+    postme: {
+        resourseActive: {type: Boolean, default: false},
+        listening: {type: Number, default: 0},
+        listeners: {type: Array, default: []}
+    },    
+});
+
+
 const ArticleModel = mongoose.model('ArticleModel', articleSchema);
+const ChatModel = mongoose.model('ChatModel', chatSchema);
 const DelorianModel = mongoose.model('DelorianModel', delorianSchema);
 const RespectModel = mongoose.model('RespectModel', respectSchema);
 const UserModel = mongoose.model('UserModel', userSchema);
 
 
-module.exports = {DelorianModel, RespectModel, ArticleModel, UserModel};
+module.exports = {DelorianModel, RespectModel, ArticleModel, UserModel, ChatModel};

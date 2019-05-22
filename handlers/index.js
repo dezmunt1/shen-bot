@@ -3,6 +3,7 @@ const weatherApp = require('./weatherApp');
 const getArticle = require('./getArticle');
 const delorian = require('./delorian');
 const respect = require('./respect');
+const postme = require('./postme');
 
 
 module.exports = {
@@ -10,5 +11,6 @@ module.exports = {
     weatherApp,
     getArticle,
     delorian,
-    respect
+    respect,
+    postme
 };

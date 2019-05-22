@@ -15,6 +15,7 @@ module.exports = ctx => {
     .then((respon) => {
       let temp = respon.data.main.temp - 273.15;
       ctx.reply(`В городе ${cityIn(city)} сейчас ${Math.round(temp)} ℃`);
+      return;
     })
     .catch( (error) => {
       console.log(error);

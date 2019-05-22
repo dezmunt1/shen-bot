@@ -1,7 +1,7 @@
 const {correctTime, formatDate} = require('./dateTransform');
 const articleParser = require('../utils/articleParser');
 const Markup = require('telegraf/markup');
-const {DelorianModel, RespectModel, ArticleModel, UserModel} = require('../models/schemas');
+const {DelorianModel, RespectModel, ArticleModel, UserModel, ChatModel} = require('../models/schemas');
 
 const dlMongoListener = function(ctx){
     setInterval(() => { // лушаем delorian
@@ -22,7 +22,6 @@ const dlMongoListener = function(ctx){
         });
     }, 1000);
 };
-
 const respectMongoListener = function(ctx) {
     let thisChatId = ctx.chat.id;                          // данные при текущем нажатии на кнопку
     let thisMessId = ctx.callbackQuery.message.message_id;
@@ -117,7 +116,7 @@ const articleMongoListener = function(reqResourse, parser) {
 
 }
 const userMongoListener = function(ctx, params) {
-    const reqDB = new Promise ((resolve, rej) => {
+    return new Promise ((resolve, rej) => {
         UserModel.findOne({userId: ctx.from.id}, (err, res) =>{
             if (err) {console.log(err); return;}
             if (res) {resolve(res)};
@@ -125,36 +124,187 @@ const userMongoListener = function(ctx, params) {
                 const newUser = new UserModel({
                     firstName: ctx.from.first_name,
                     userName: ctx.from.username || ctx.from.first_name,
-                    userId: ctx.from.id
+                    userId: ctx.from.id,
+                    isBot: ctx.from.is_bot,
+                    lang: ctx.from.language_code,
                 });
-                newUser.save((err)=>{
+                newUser.save((err, savedUser)=>{
                     if (err) console.error(err);
-                    resolve();
+                    resolve(`Добавлен новый пользователь ${savedUser.userName}`);
                 })
             }
         })
     });
-    return new Promise( (resolve, rej) => {
-        reqDB
-            .then((resp) => {
-                if (resp) {
-                    resolve(resp)
+}
+const postmeMongoListener = function(ctx, params) {
+
+    if (params.getPost) {
+        return new Promise( (resolve, rej) => {
+            ChatModel.findOne({chatID: ctx.chat.id}, (err, res) =>{
+                if (err || res === null) {console.log(err || 'error'); return};
+                if (res.postme.listening === 0) {
+                    resolve('Сначала веберите источник. <b>Введите</b> <code>/postme options</code>')
                 } else {
-                    UserModel.findOne({userId: ctx.from.id}, (err, res) =>{
-                        if (err) {console.log(err); return;}
+                    ChatModel.findOne({chatID: res.postme.listening}, (err, res) =>{
+                        if (err) {console.log(err); return};
                         resolve(res);
                     });
+                }
+            });
+        });
+    }
+
+    if (params.listening) {
+        return new Promise( (resolve, rej) => {
+            ChatModel.findOne({chatID: ctx.chat.id}, (err, res) =>{ // меняем ресурс на новый
+                if (err) {console.log(err); return};
+                const oldestResource = res.postme.listening;
+                res.postme.listening = params.listening;
+                res.save((err)=> {
+                    if (err) {console.log(err); return};
+                });
+
+                ChatModel.findOne({chatID: oldestResource}, (err, resp) =>{ // уберем из списка слушателей старый ресурс
+                    if (err) {console.log(err); return};
+                    if (oldestResource !== 0) { // старый ресурс будет 0 если до этого он ничего не слушал
+                        resp.postme.listeners = resp.postme.listeners.filter( item => {
+                            return item !== ctx.chat.id;
+                        });
+                        resp.save( (err)=> {
+                            if (err) {console.log(err); return};
+                        });
+                    };
+                });
+
+                ChatModel.findOne({chatID: params.listening}, (err, resp) =>{ // добавим в список слушателей новый ресурс
+                    if (err) {console.log(err); return};
+                    resp.postme.listeners.push(ctx.chat.id);
+                    resp.save( (err)=> {
+                        if (err) {console.log(err); return};
+                        resolve(`Ресурс \"${resp.title || resp.username}\" успешно выбран!`)
+                    });
+                });
+            });
+            
+            
+        });
+        
+    }
+
+    if (params.selected) {
+        return new Promise( (resolve, rej) => {
+            ChatModel.find({"postme.resourseActive": true}, (err, res) =>{
+                if (err) {console.log(err); return};
+                if (res === null || res.length === 0) {
+                    resolve(false);
+                } else {
+                    resolve(res);
                 };
-            })
-            .catch(err => {
-            rej(err);
-        }); 
+            });
+        });
+        
+    };
+
+    if (params.adding) {
+        return new Promise( (resolve, rej) => {
+            ChatModel.findOne({chatID: ctx.chat.id, "postme.resourseActive": false}, (err, res) =>{
+                if (err) {console.log(err); return};
+                if (res === null) {
+                    resolve(true)
+                    return;
+                };
+                res.postme.resourseActive = true;
+                res.save((err)=>{
+                    if (err) console.error(err);
+                    resolve(false);
+                });
+            });
+        
+        });
+    };
+
+    if (params.delete) {
+        return new Promise ( (resolve, rej) => {
+            ChatModel.find((err, res) =>{
+                if (err) {console.log(err); return};
+                res.forEach( item => {
+                    if (item.postme.listening === ctx.chat.id){ 
+                        item.postme.listening = 0;
+                    };
+                    item.save();
+                });
+            });
+
+            ChatModel.findOne( {chatID: ctx.chat.id}, (err, res) =>{
+                if (err) {console.log(err); return};
+                res.postme.listeners = [];
+                res.save();
+            });
+
+            ChatModel.findOne({chatID: ctx.chat.id}, (err, res) =>{
+                if (err) {console.log(err); return};
+                if (res.postme.resourseActive === false) {resolve(false); return};
+                res.postme.resourseActive = false;
+                res.save(err => {
+                    if (err) {console.log(err); return};
+                    resolve(true);
+                });
+            });
+        });
+    };
+};
+
+const addChatMongoListener = function(chat, ctx) {
+    return new Promise( (resolve, rej) => {
+        ChatModel.findOne({chatID: chat.id}, (err, res) =>{
+            if (err) {console.log(err); return};
+            if (res === null) {
+                const newChat = new ChatModel({
+                    chatID: chat.id,
+                    description: chat.description || 'Без описания',
+                    photoLogo: chat.photo,
+                    title: chat.title,
+                    chatType: chat.type,
+                    username: chat.username || 'Без имени',
+                    maxMsgId: returnMsgId(ctx),
+                    listening: [],   
+                });
+                newChat.save((err, futureMessage)=>{
+                    if (err) console.error(err);
+                    resolve(`${chat.type} ${chat.title || chat.username} успешно добавлен в базу`);
+                });
+            };
+            if (res) {
+                res.description = chat.description || 'Без описания';
+                res.photoLogo = chat.photo;
+                res.title = chat.title;
+                res.chatType = chat.type;
+                res.username = chat.username || 'Без имени';
+                if (returnMsgId(ctx)) {
+                    res.maxMsgId = returnMsgId(ctx);
+                }
+                res.save((err, futureMessage)=>{
+                    if (err) console.error(err);
+                    resolve(`${chat.type} ${chat.title || chat.username} успешно обновлен`);
+                });
+            }
+        });
     });
+    
+    
+}
+
+function returnMsgId(ctx) {
+    const msgChannel = ctx.message ? ctx.message.message_id : false;
+    const msgGroup = ctx.channelPost ? ctx.channelPost.message_id : false;
+    return msgGroup || msgChannel
 }
 
 module.exports = {
     dlMongoListener,
     respectMongoListener,
     articleMongoListener,
-    userMongoListener
+    userMongoListener,
+    postmeMongoListener,
+    addChatMongoListener
 };

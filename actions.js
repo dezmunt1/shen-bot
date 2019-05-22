@@ -1,19 +1,28 @@
 const Router = require('telegraf/router');
-const {enter, leave} = require('telegraf/stage');
-const Stage = require('telegraf/stage');
 const {respectMongoListener} = require('./utils/mongoListener');
+const {setSource, delSource, selectSource, selectedSource} = require('./handlers/postme');
+const {sendFutureScene, enteringText} = require('./handlers/delorian');
 
 
 
-const stage = new Stage();
+
+const sendToRegister = [ // export
+    sendFutureScene,
+    enteringText
+];
 
 const callbackQuerys = new Router((ctx) => {
     if (!ctx.callbackQuery.data) return;
+    const cbData = ctx.callbackQuery.data.split(':');
     return {
-        route: ctx.callbackQuery.data
+        route: cbData[0],
+        state: {
+            cbParams: cbData[1]
+        }
     }
 });
 ;
+
 callbackQuerys.on('sendFuture', (ctx) => {
     try {
         ctx.scene.enter('sendFuture');
@@ -21,24 +30,57 @@ callbackQuerys.on('sendFuture', (ctx) => {
     } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
         ctx.answerCbQuery('Этот опрос не актуален, введите /delorian еще раз', false);
     };
-    
-    
 });
+
 callbackQuerys.on('exitScene', (ctx) => {
     ctx.deleteMessage(ctx.callbackQuery.message.message_id);
     ctx.answerCbQuery('Ну и не надо', false);
     ctx.scene.leave();
     console.log('Выход из сцены');
 });
+
 callbackQuerys.on('like', (ctx) => {
     respectMongoListener(ctx);
     ctx.answerCbQuery('Заебись', false);
 });
+
 callbackQuerys.on('dislike', (ctx) => {
     respectMongoListener(ctx);
     ctx.answerCbQuery('Говно', false);
 });
 
+callbackQuerys.on('selectSource', (ctx) => {
+    try {
+        selectSource(ctx);
+    } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
+        ctx.answerCbQuery('Этот опрос не актуален', false);
+    };
+});
+callbackQuerys.on('selectedSource', (ctx) => {
+    try {
+        const resource = ctx.state.cbParams;
+        selectedSource(ctx, resource);
+    } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
+        ctx.answerCbQuery('Этот опрос не актуален', false);
+    };
+});
+callbackQuerys.on('setSource', (ctx) => {
+    try {
+        setSource(ctx);
+    } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
+        ctx.answerCbQuery('Этот опрос не актуален', false);
+    };
+});
+callbackQuerys.on('delSource', (ctx) => {
+    try {
+        delSource(ctx);
+    } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
+        ctx.answerCbQuery('Этот опрос не актуален', false);
+    };
+});
 
 
-module.exports =  callbackQuerys;
+module.exports =  {
+    callbackQuerys,
+    sendToRegister
+};

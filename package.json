@@ -17,6 +17,7 @@
     "mongoose": "^5.4.20",
     "osmosis": "^1.1.10",
     "petrovich": "^0.2.1",
+    "random-js": "^2.0.0",
     "rss-parser": "^3.7.0",
     "telegraf": "^3.27.1",
     "telegraf-ratelimit": "^2.0.0"
