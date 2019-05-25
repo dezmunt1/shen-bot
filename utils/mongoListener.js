@@ -138,19 +138,62 @@ const userMongoListener = function(ctx, params) {
 }
 const postmeMongoListener = function(ctx, params) {
 
-    if (params.getPost) {
+    if (params.getMsgTypes) {
         return new Promise( (resolve, rej) => {
             ChatModel.findOne({chatID: ctx.chat.id}, (err, res) =>{
                 if (err || res === null) {console.log(err || 'error'); return};
-                if (res.postme.listening === 0) {
-                    resolve('Сначала веберите источник. <b>Введите</b> <code>/postme options</code>')
-                } else {
-                    ChatModel.findOne({chatID: res.postme.listening}, (err, res) =>{
-                        if (err) {console.log(err); return};
-                        resolve(res);
-                    });
-                }
+                switch(params.getMsgTypes) {
+                    case 'current':
+                        resolve(res.postme.mediaTypes);
+                        return;
+                    case 'all':
+                        res.postme.mediaTypes.links = false;
+                        res.postme.mediaTypes.video = false;
+                        res.postme.mediaTypes.photo = false;
+                        res.postme.mediaTypes.all = !res.postme.mediaTypes.all; 
+                        break;
+                    case 'photo':
+                        res.postme.mediaTypes.all = false; 
+                        res.postme.mediaTypes.photo = !res.postme.mediaTypes.photo; 
+                        break;
+                    case 'video':
+                        res.postme.mediaTypes.all = false; 
+                        res.postme.mediaTypes.video = !res.postme.mediaTypes.video; 
+                        break;
+                    case 'links':
+                        res.postme.mediaTypes.all = false; 
+                        res.postme.mediaTypes.links = !res.postme.mediaTypes.links; 
+                        break;
+                };
+                res.save((err, savedRes)=> {
+                    if (err) {console.log(err); return};
+                    resolve(savedRes.postme.mediaTypes);
+                });
             });
+        });
+    };
+
+    if (params.getPost) {
+        return new Promise( (resolve, rej) => {
+            if(params.getPost === 'sendPost') {
+                ChatModel.findOne({chatID: ctx.chat.id}, (err, res) =>{
+                    if (err || res === null) {console.log(err || 'error'); return};
+                    if (res.postme.listening === 0) {
+                        resolve('Сначала веберите источник. <b>Введите</b> <code>/postme options</code>')
+                    } else {
+                        ChatModel.findOne({chatID: res.postme.listening}, (err, res) =>{
+                            if (err) {console.log(err); return};
+                            resolve(res);
+                        });
+                    }
+                });
+            }
+            if (params.getPost === 'getThisChat') {
+                ChatModel.findOne({chatID: ctx.chat.id}, (err, res) =>{
+                    if (err || res === null) {console.log(err || 'error'); return};
+                    resolve(res.postme.mediaTypes);
+                });
+            };
         });
     }
 

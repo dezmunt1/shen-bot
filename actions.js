@@ -1,6 +1,6 @@
 const Router = require('telegraf/router');
-const {respectMongoListener} = require('./utils/mongoListener');
-const {setSource, delSource, selectSource, selectedSource} = require('./handlers/postme');
+const {respectMongoListener, postmeMongoListener} = require('./utils/mongoListener');
+const {setSource, delSource, selectSource, selectedSource, replys, typeSource} = require('./handlers/postme');
 const {sendFutureScene, enteringText} = require('./handlers/delorian');
 
 
@@ -71,9 +71,36 @@ callbackQuerys.on('setSource', (ctx) => {
         ctx.answerCbQuery('Этот опрос не актуален', false);
     };
 });
+callbackQuerys.on('getSource', (ctx) => {
+    try {
+        const resource = ctx.state.cbParams;
+        replys(ctx, resource);
+    } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
+        ctx.answerCbQuery('Этот опрос не актуален', false);
+    };
+});
+callbackQuerys.on('typeSource', (ctx) => {
+    try {
+        const msgType = ctx.state.cbParams;
+        postmeMongoListener(ctx, {getMsgTypes: msgType})
+            .then ( type => {
+                typeSource(ctx, type);
+                return;
+            })
+    } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
+        ctx.answerCbQuery('Этот опрос не актуален', false);
+    };
+});
 callbackQuerys.on('delSource', (ctx) => {
     try {
         delSource(ctx);
+    } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
+        ctx.answerCbQuery('Этот опрос не актуален', false);
+    };
+});
+callbackQuerys.on('deleteThisMsg', (ctx) => {
+    try {
+        ctx.deleteMessage(ctx.callbackQuery.message.message_id);
     } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
         ctx.answerCbQuery('Этот опрос не актуален', false);
     };

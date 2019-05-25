@@ -44,6 +44,12 @@ const chatSchema = new mongoose.Schema({
     username: String,
     maxMsgId: Number,
     postme: {
+        mediaTypes: {
+            links: {type: Boolean, default: false},
+            photo: {type: Boolean, default: false},
+            video: {type: Boolean, default: false},
+            all: {type: Boolean, default: true}
+        },
         resourseActive: {type: Boolean, default: false},
         listening: {type: Number, default: 0},
         listeners: {type: Array, default: []}

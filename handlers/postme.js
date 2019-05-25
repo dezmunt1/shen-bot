@@ -1,25 +1,26 @@
 const Scene = require('telegraf/scenes/base');
 const {Random} = require('random-js');
-const {postmeMongoListener} = require('../utils/mongoListener');
+const {postmeMongoListener, } = require('../utils/mongoListener');
 const serviceMsg = require('../models/serviceMsg');
 
 const random = new Random();
 
 const mess = {};
 
-const replys = (ctx) => {
+const replys = (ctx, params) => { // main
     
     const channPostTrue = ctx.channelPost ? (ctx.channelPost.text.slice(8)).toLowerCase() : false; 
 
-    if (ctx.match && ctx.match[1].toLowerCase() || channPostTrue === 'options') {
+    if ((ctx.match && ctx.match[1].toLowerCase() === 'options') || params === 'options' || channPostTrue === 'options') {
         ctx.deleteMessage( delCommandMsg(ctx) );
         
         ctx.reply('Настроим репостер ⚙', {reply_markup:
             {inline_keyboard: [
-                [{ text: '📃 Откуда репостим', callback_data: 'selectSource', hide: false}],
-                [{ text: '📌 Выбрать чат как источник', callback_data: 'setSource', hide: false}],
-                [{ text: '🗑 Удалить чат из источников', callback_data: 'delSource', hide: false }]
-            ]
+                    [{ text: '📃 Откуда репостим', callback_data: 'selectSource', hide: false}],
+                    [{ text: '📌 Выбрать чат как источник', callback_data: 'setSource', hide: false}],
+                    [{ text: '✔️ Выбрать тип контента', callback_data: 'typeSource:current', hide: false }],
+                    [{ text: '🗑 Удалить чат из источников', callback_data: 'delSource', hide: false }]
+                ]
             }
         }
         ).then( ctx_then => {
@@ -28,6 +29,11 @@ const replys = (ctx) => {
         })
         .catch(err => console.log(err));
     } else {
+        ctx.reply('Ожидайте')
+            .then( ctx_then => {
+                mess.timeStart = new Date(2019, 0, 1);
+                timer.start();
+            });
         getPost(ctx);        
     }
 };
@@ -84,8 +90,6 @@ const setSource = (ctx) => {
         }) 
 };
 
-
-
 const selectedSource = (ctx, resource) => {
     postmeMongoListener(ctx, {listening: resource})
         .then( returned => {
@@ -102,6 +106,22 @@ const selectedSource = (ctx, resource) => {
         })
 }
 
+const typeSource = (ctx, msgType) => {
+    const cbButtons = [[{ text: `🖼 Фото ${checkBox(msgType.photo)}`, callback_data: 'typeSource:photo', hide: false }, { text: `🎥 Видео ${checkBox(msgType.video)}`, callback_data: 'typeSource:video', hide: false },{ text: `🔗 Ссылки ${checkBox(msgType.links)}`, callback_data: 'typeSource:links', hide: false }],
+                [{ text: `♾ Любой ${checkBox(msgType.all)}`, callback_data: 'typeSource:all', hide: false }],
+                [{ text: `🔰 Выход 🔰`, callback_data: 'deleteThisMsg', hide: false }]
+    ];
+    const customExtra = { reply_markup: {inline_keyboard: cbButtons}, parse_mode: 'HTML'};
+    const message = 'Выберите какой контент вы готовы получать';
+
+    ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, message , customExtra)
+                .catch(err => {
+                    if (err.message === serviceMsg.err400_oldLink) {
+                        ctx.answerCbQuery('Этот опрос не актуален', false);
+                    };
+                    console.log(err);
+                })
+};
 
 const delSource = (ctx) => {
     postmeMongoListener(ctx, {delete: true})
@@ -115,7 +135,7 @@ const delSource = (ctx) => {
                 }, 1000 * 15);
             })
             .catch(err => {
-                if (err.message === serviceMsg.cb400) {
+                if (err.message === serviceMsg.err400_oldLink) {
                     ctx.answerCbQuery('Этот опрос не актуален', false);
                 }
                 console.log(err);
@@ -144,13 +164,34 @@ function genListResources(arr) {
     });
     return cbBtns;
 }
+function checkBox(bool) {
+    return bool === true ? '✅' : '⬜️'
+
+}
+const timer = {
+    start: (date) => {
+        this.increment = 0;
+        this.startDate = date;
+        this.waitTime = setInterval(() => {
+            newSec = mess.timeStart.setSeconds(mess.timeStart.getSeconds() + 1);
+            mess.timeStart = new Date(newSec);
+            ctx.telegram.editMessageText(ctx_then.chat.id, ctx_then.message_id, null, message);
+        }, 1000);
+        
+        return `Ожидайте ${mess.timeStart.getMinutes()}:${mess.timeStart.getSeconds()}`
+    },
+    stop: () => {
+        clearInterval(this.waitTime);
+    },
+    
+};
 
 function delCommandMsg(ctx) {
     return ctx.message === undefined ? ctx.channelPost.message_id : ctx.message.message_id;
 }
-
+let bue;
 function getPost (ctx) {
-    postmeMongoListener(ctx, {getPost: true})
+    postmeMongoListener(ctx, {getPost: 'sendPost'})
         .then( result => {
             if (typeof(result) === 'string') {
                 ctx.reply(result, {parse_mode: 'HTML'})
@@ -161,10 +202,15 @@ function getPost (ctx) {
                     }) 
             } else {
                 const messageId = random.integer(1, result.maxMsgId);
-                ctx.telegram.forwardMessage(ctx.chat.id, result.chatID, messageId)
+                ctx.telegram.forwardMessage(process.env.BUFFER_CHAN, result.chatID, messageId, {disable_notification: true})
+                    .then(messeg => {
+                        contentFilter(ctx, result, messeg);
+                        if (bue) clearTimeout(bue);
+                        return;
+                    })
                     .catch(err => {
                         if (err.message = 'Error: 400: Bad Request: message to forward not found') {
-                            setTimeout( () => {
+                            bue = setTimeout( () => {
                                 getPost(ctx)
                             }, 30)
                         };
@@ -173,13 +219,39 @@ function getPost (ctx) {
         });
 
 }        
+function contentFilter(ctx, result, message) {
+    postmeMongoListener(ctx, {getPost: 'getThisChat'})
+        .then( currentTypes => {
+            messageId = message.forward_from_message_id;
+            if (currentTypes.all) {
+                clearInterval(mess.waitTime);
+                ctx.telegram.forwardMessage(ctx.chat.id, result.chatID, messageId);
+                return;
+            };
+            if (currentTypes.photo && message.photo) {
+                clearInterval(mess.waitTime);
+                ctx.telegram.forwardMessage(ctx.chat.id, result.chatID, messageId);
+                return;
+            };
+            if (currentTypes.video && message.video) {
+                clearInterval(mess.waitTime);
+                ctx.telegram.forwardMessage(ctx.chat.id, result.chatID, messageId);
+                return;
+            };
+            if (currentTypes.links) {
+                ctx.telegram.forwardMessage(ctx.chat.id, result.chatID, messageId);
+                return;
+            };
+            getPost(ctx);
+            return;
+        })
+}
 
-/* const messageId = random()
-    ctx.telegram.forwardMessage(ctx.chat.id, -1001148975601, messageId);   */
 module.exports = {
     replys,
     selectSource,
     selectedSource,
     setSource,
-    delSource
+    delSource,
+    typeSource
 }
