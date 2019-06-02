@@ -31,11 +31,10 @@ const replys = (ctx, params) => { // main
     } else {
         ctx.reply('Ожидайте')
             .then( ctx_then => {
-                mess.timeStart = new Date(2019, 0, 1);
-                timer.start();
-            });
-        getPost(ctx);        
-    }
+                timer.start(ctx_then, ctx);
+                getPost(ctx);
+            });        
+    };
 };
 
 const selectSource = (ctx) => {
@@ -169,26 +168,32 @@ function checkBox(bool) {
 
 }
 const timer = {
-    start: (date) => {
-        this.increment = 0;
-        this.startDate = date;
+    start: (ctx_then, ctx) => {
+        const startDate = new Date(Date.UTC(2019, 0, 1));
+        this.ctx_then = ctx_then;
         this.waitTime = setInterval(() => {
-            newSec = mess.timeStart.setSeconds(mess.timeStart.getSeconds() + 1);
-            mess.timeStart = new Date(newSec);
-            ctx.telegram.editMessageText(ctx_then.chat.id, ctx_then.message_id, null, message);
+            startDate.setSeconds(startDate.getSeconds() + 1);
+            let minutes = String(new Date(startDate).getMinutes());
+            let seconds = String(new Date(startDate).getSeconds());
+            if (minutes.length < 2 || seconds.length < 2) {
+                minutes = minutes.length < 2 ?  "0" + minutes : minutes;
+                seconds = seconds.length < 2 ?  "0" + seconds : seconds;
+            };
+            const message = `Ожидайте, прошло времени ${minutes}:${seconds}`;
+            ctx.telegram.editMessageText(this.ctx_then.chat.id, this.ctx_then.message_id, null, message);
         }, 1000);
-        
-        return `Ожидайте ${mess.timeStart.getMinutes()}:${mess.timeStart.getSeconds()}`
     },
-    stop: () => {
+    stop: (ctx) => {
         clearInterval(this.waitTime);
+        ctx.deleteMessage(this.ctx_then.message_id);
     },
     
 };
 
 function delCommandMsg(ctx) {
     return ctx.message === undefined ? ctx.channelPost.message_id : ctx.message.message_id;
-}
+};
+
 let bue;
 function getPost (ctx) {
     postmeMongoListener(ctx, {getPost: 'sendPost'})
@@ -224,17 +229,17 @@ function contentFilter(ctx, result, message) {
         .then( currentTypes => {
             messageId = message.forward_from_message_id;
             if (currentTypes.all) {
-                clearInterval(mess.waitTime);
+                timer.stop(ctx);
                 ctx.telegram.forwardMessage(ctx.chat.id, result.chatID, messageId);
                 return;
             };
             if (currentTypes.photo && message.photo) {
-                clearInterval(mess.waitTime);
+                timer.stop(ctx);
                 ctx.telegram.forwardMessage(ctx.chat.id, result.chatID, messageId);
                 return;
             };
             if (currentTypes.video && message.video) {
-                clearInterval(mess.waitTime);
+                timer.stop(ctx);
                 ctx.telegram.forwardMessage(ctx.chat.id, result.chatID, messageId);
                 return;
             };
