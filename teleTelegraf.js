@@ -104,7 +104,9 @@ articleMongoListener();
 bot.on('callback_query', actions.callbackQuerys);
 
 
-bot.catch((err) => {console.log('Ooops', err)});
+bot.catch((err) => {
+  console.log('Ooops', err);
+});
 
 bot.launch();
 

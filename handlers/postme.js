@@ -9,7 +9,12 @@ const mess = {};
 
 const replys = (ctx, params) => { // main
     
-    const channPostTrue = ctx.channelPost ? (ctx.channelPost.text.slice(8)).toLowerCase() : false; 
+    const channPostTrue = ctx.channelPost ? (ctx.channelPost.text.slice(8)).toLowerCase() : false;
+
+    postmeMongoListener(ctx, {getPost: 'getMediatypes'})
+        .then(resolved => {
+            mess.currentTypes = resolved;
+        });
 
     if ((ctx.match && ctx.match[1].toLowerCase() === 'options') || params === 'options' || channPostTrue === 'options') {
         ctx.deleteMessage( delCommandMsg(ctx) );
@@ -29,9 +34,9 @@ const replys = (ctx, params) => { // main
         })
         .catch(err => console.log(err));
     } else {
-        ctx.reply('Ожидайте')
+        ctx.telegram.sendPhoto(ctx.chat.id, "AgADAgADmqsxG6B52Uvte645Hdut8HBEhA8ABBk7vbRH9WCIXJ8BAAEC")
             .then( ctx_then => {
-                timer.start(ctx_then, ctx);
+                timer.wait(ctx_then, ctx);
                 getPost(ctx);
             });        
     };
@@ -106,7 +111,7 @@ const selectedSource = (ctx, resource) => {
 }
 
 const typeSource = (ctx, msgType) => {
-    const cbButtons = [[{ text: `🖼 Фото ${checkBox(msgType.photo)}`, callback_data: 'typeSource:photo', hide: false }, { text: `🎥 Видео ${checkBox(msgType.video)}`, callback_data: 'typeSource:video', hide: false },{ text: `🔗 Ссылки ${checkBox(msgType.links)}`, callback_data: 'typeSource:links', hide: false }],
+    const cbButtons = [[{ text: `🖼 Фото ${checkBox(msgType.photo)}`, callback_data: 'typeSource:photo', hide: false }, { text: `🎥 Видео/GIF ${checkBox(msgType.video)}`, callback_data: 'typeSource:video', hide: false },{ text: `🔗 Ссылки ${checkBox(msgType.links)}`, callback_data: 'typeSource:links', hide: false }],
                 [{ text: `♾ Любой ${checkBox(msgType.all)}`, callback_data: 'typeSource:all', hide: false }],
                 [{ text: `🔰 Выход 🔰`, callback_data: 'deleteThisMsg', hide: false }]
     ];
@@ -168,10 +173,10 @@ function checkBox(bool) {
 
 }
 const timer = {
-    start: (ctx_then, ctx) => {
+    wait: (ctx_then, ctx) => {
         const startDate = new Date(Date.UTC(2019, 0, 1));
         this.ctx_then = ctx_then;
-        this.waitTime = setInterval(() => {
+        /* this.waitTime = setInterval(() => {
             startDate.setSeconds(startDate.getSeconds() + 1);
             let minutes = String(new Date(startDate).getMinutes());
             let seconds = String(new Date(startDate).getSeconds());
@@ -181,11 +186,17 @@ const timer = {
             };
             const message = `Ожидайте, прошло времени ${minutes}:${seconds}`;
             ctx.telegram.editMessageText(this.ctx_then.chat.id, this.ctx_then.message_id, null, message);
-        }, 1000);
+        }, 1000); */
     },
-    stop: (ctx) => {
-        clearInterval(this.waitTime);
-        ctx.deleteMessage(this.ctx_then.message_id);
+    send: (ctx, media) => {
+        const extra = {reply_markup:
+            {inline_keyboard: [ [ { text: '🔄 Еще', callback_data: 'getSource', hide: false } ] ] }
+        };
+        ctx.telegram.editMessageMedia(ctx.chat.id, this.ctx_then.message_id, null, media, extra);
+        return;
+    },
+    delMsg: () => {
+        ctx.telegram.deleteMessage(this.ctx_then.message_id);
     },
     
 };
@@ -210,47 +221,72 @@ function getPost (ctx) {
                 ctx.telegram.forwardMessage(process.env.BUFFER_CHAN, result.chatID, messageId, {disable_notification: true})
                     .then(messeg => {
                         contentFilter(ctx, result, messeg);
-                        if (bue) clearTimeout(bue);
+                        if (bue) {
+                            clearTimeout(bue)
+                        };
                         return;
                     })
                     .catch(err => {
-                        if (err.message = 'Error: 400: Bad Request: message to forward not found') {
+                        if (err.code == 429) {
+                            ctx.reply(`Что то пошло не так, эту команду можно повторить через ${err.parameters.retry_after} секунд!`);
+                        };
+                        if (err.message == '400: Bad Request: message to forward not found') {
                             bue = setTimeout( () => {
                                 getPost(ctx)
-                            }, 30)
+                            }, 50)
+                        } else {
+                            ctx.answerCbQuery(ctx.callbackQuery.id, 'Этот опрос не актуален', false);
+                            console.log(err)
                         };
+                        return;
                     });
             };
         });
 
 }        
 function contentFilter(ctx, result, message) {
-    postmeMongoListener(ctx, {getPost: 'getThisChat'})
-        .then( currentTypes => {
-            messageId = message.forward_from_message_id;
-            if (currentTypes.all) {
-                timer.stop(ctx);
-                ctx.telegram.forwardMessage(ctx.chat.id, result.chatID, messageId);
-                return;
-            };
-            if (currentTypes.photo && message.photo) {
-                timer.stop(ctx);
-                ctx.telegram.forwardMessage(ctx.chat.id, result.chatID, messageId);
-                return;
-            };
-            if (currentTypes.video && message.video) {
-                timer.stop(ctx);
-                ctx.telegram.forwardMessage(ctx.chat.id, result.chatID, messageId);
-                return;
-            };
-            if (currentTypes.links) {
-                ctx.telegram.forwardMessage(ctx.chat.id, result.chatID, messageId);
-                return;
-            };
-            getPost(ctx);
-            return;
-        })
-}
+    const messageId = message.forward_from_message_id;
+
+    if (mess.currentTypes.all) {
+        timer.stop(ctx);
+        ctx.telegram.forwardMessage(ctx.chat.id, result.chatID, messageId);
+        return;
+    };
+
+    if (mess.currentTypes.photo && message.photo) {
+        let photo = message.photo[3] ? message.photo[3].file_id
+            : message.photo[2] ? message.photo[2].file_id
+            : message.photo[1] ? message.photo[1].file_id : message.photo[0].file_id;
+        photo = {type: "photo", media: photo};
+        timer.send(ctx, photo);
+        return;
+    };
+    if (mess.currentTypes.video && (message.video || message.document || message.video_note)) {
+
+        if (message.video) {
+            const video = {type: "video", media: message.video.file_id};
+            timer.send(ctx, video);
+        };
+        if (message.document) {
+            const video = {type: "document", media: message.document.file_id};
+            timer.send(ctx, video);
+        };
+        if (message.video_note) {
+            timer.delMsg();
+            const video = message.video_note.file_id;
+            ctx.telegram.sendVideoNote(ctx.chat.id, video);
+        };
+
+        return;
+    };
+    if (mess.currentTypes.links) {
+        ctx.telegram.forwardMessage(ctx.chat.id, result.chatID, messageId);
+        return;
+    };
+    getPost(ctx);
+    return;
+};
+
 
 module.exports = {
     replys,
@@ -258,5 +294,6 @@ module.exports = {
     selectedSource,
     setSource,
     delSource,
-    typeSource
+    typeSource,
+    getPost,
 }

@@ -188,7 +188,7 @@ const postmeMongoListener = function(ctx, params) {
                     }
                 });
             }
-            if (params.getPost === 'getThisChat') {
+            if (params.getPost === 'getMediatypes') {
                 ChatModel.findOne({chatID: ctx.chat.id}, (err, res) =>{
                     if (err || res === null) {console.log(err || 'error'); return};
                     resolve(res.postme.mediaTypes);

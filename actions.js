@@ -1,6 +1,6 @@
 const Router = require('telegraf/router');
 const {respectMongoListener, postmeMongoListener} = require('./utils/mongoListener');
-const {setSource, delSource, selectSource, selectedSource, replys, typeSource} = require('./handlers/postme');
+const {setSource, delSource, selectSource, selectedSource, replys, typeSource, getPost} = require('./handlers/postme');
 const {sendFutureScene, enteringText} = require('./handlers/delorian');
 
 
@@ -74,7 +74,8 @@ callbackQuerys.on('setSource', (ctx) => {
 callbackQuerys.on('getSource', (ctx) => {
     try {
         const resource = ctx.state.cbParams;
-        replys(ctx, resource);
+        getPost(ctx, resource);
+        ctx.answerCbQuery('Ищу новый контент', false);
     } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
         ctx.answerCbQuery('Этот опрос не актуален', false);
     };
