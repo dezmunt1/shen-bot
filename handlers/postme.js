@@ -46,7 +46,7 @@ const replys = (ctx, params) => { // main
             const chatInstance = JSON.parse(result);
 
             if (ctx.callbackQuery.message.text || ctx.callbackQuery.message.voice || ctx.callbackQuery.message.video_note) { // Если предыдущее сообщение было текстом, затрём его
-                ctx.telegram.sendPhoto(ctx.chat.id, "AgADAgADUqoxG20y4Ut_lakMhc0CcjlChA8ABKUBUKdVPqKLC6IBAAEC")
+                ctx.telegram.sendPhoto(ctx.chat.id, "AgADAgADUasxG0DM0EnjG3eTgcJky7RKhA8ABBPisIHPGjR9HZcDAAEC")
                     .then(ctx_then => {
                         ctx.telegram.deleteMessage(ctx.chat.id, ctx.callbackQuery.message.message_id);
                         chatInstance[chatId] = ctx_then.message_id;
@@ -66,7 +66,7 @@ const replys = (ctx, params) => { // main
         return
     } else {
         const redisClient = ctx.state.redis;
-        ctx.telegram.sendPhoto(ctx.chat.id, "AgADAgADUqoxG20y4Ut_lakMhc0CcjlChA8ABKUBUKdVPqKLC6IBAAEC")
+        ctx.telegram.sendPhoto(ctx.chat.id, "AgADAgADUasxG0DM0EnjG3eTgcJky7RKhA8ABBPisIHPGjR9HZcDAAEC")
             .then( ctx_then => {
                 if (!redisClient) return;
                 redisClient.get('chatsPostme', (err, result) => {
