@@ -1,7 +1,8 @@
-const {correctTime, formatDate} = require('./dateTransform');
-const articleParser = require('../utils/articleParser');
+const {correctTime, formatDate} = require('../dateTransform');
+const articleParser = require('../articleParser');
 const Markup = require('telegraf/markup');
-const {DelorianModel, RespectModel, ArticleModel, UserModel, ChatModel} = require('../models/schemas');
+const {DelorianModel, RespectModel, ArticleModel, UserModel, ChatModel} = require('../../models/schemas');
+const handlerMessages = require('../handlerMessages');
 
 const dlMongoListener = function(ctx){
     setInterval(() => { // лушаем delorian
@@ -117,6 +118,7 @@ const articleMongoListener = function(reqResourse, parser) {
 }
 const userMongoListener = function(ctx, params) {
     return new Promise ((resolve, rej) => {
+        if ( !ctx.from ) rej( `В ${ctx.chat.title} сохранение пользователей в ДБ не доступно` );
         UserModel.findOne({userId: ctx.from.id}, (err, res) =>{
             if (err) {console.log(err); return;}
             if (res) {resolve(res)};
@@ -150,6 +152,7 @@ const postmeMongoListener = function(ctx, params) {
                         res.postme.mediaTypes.links = false;
                         res.postme.mediaTypes.video = false;
                         res.postme.mediaTypes.photo = false;
+                        res.postme.mediaTypes.audio = false;
                         res.postme.mediaTypes.all = !res.postme.mediaTypes.all; 
                         break;
                     case 'photo':
@@ -163,6 +166,10 @@ const postmeMongoListener = function(ctx, params) {
                     case 'links':
                         res.postme.mediaTypes.all = false; 
                         res.postme.mediaTypes.links = !res.postme.mediaTypes.links; 
+                        break;
+                    case 'audio':
+                        res.postme.mediaTypes.all = false; 
+                        res.postme.mediaTypes.audio = !res.postme.mediaTypes.audio; 
                         break;
                 };
                 res.save((err, savedRes)=> {
@@ -183,7 +190,7 @@ const postmeMongoListener = function(ctx, params) {
                     } else {
                         ChatModel.findOne({chatID: res.postme.listening}, (err, res) =>{
                             if (err) {console.log(err); return};
-                            resolve(res);
+                            resolve(res.postme.content);
                         });
                     }
                 });
@@ -257,6 +264,7 @@ const postmeMongoListener = function(ctx, params) {
                     return;
                 };
                 res.postme.resourseActive = true;
+                ctx.telegram.sendMessage(process.env.SHEN_VISOR, `@scrapChat={"chatID":${res.chatID}, "maxMsgId":${res.maxMsgId}}`)
                 res.save((err)=>{
                     if (err) console.error(err);
                     resolve(false);
@@ -288,6 +296,7 @@ const postmeMongoListener = function(ctx, params) {
                 if (err) {console.log(err); return};
                 if (res.postme.resourseActive === false) {resolve(false); return};
                 res.postme.resourseActive = false;
+                res.postme.content = {};
                 res.save(err => {
                     if (err) {console.log(err); return};
                     resolve(true);
@@ -325,7 +334,13 @@ const addChatMongoListener = function(chat, ctx) {
                 res.username = chat.username || 'Без имени';
                 if (returnMsgId(ctx)) {
                     res.maxMsgId = returnMsgId(ctx);
+                };
+                try {
+                    addNewContent(ctx, res.postme.content);
+                } catch (e) {
+                    console.log(err)
                 }
+                res.markModified('postme.content');
                 res.save((err, futureMessage)=>{
                     if (err) console.error(err);
                     resolve(`${chat.type} ${chat.title || chat.username} успешно обновлен`);
@@ -341,6 +356,39 @@ function returnMsgId(ctx) {
     const msgChannel = ctx.message ? ctx.message.message_id : false;
     const msgGroup = ctx.channelPost ? ctx.channelPost.message_id : false;
     return msgGroup || msgChannel
+};
+function addNewContent(ctx, db) { /* content, messageId, allContent */
+    if (ctx.callbackQuery) return; // С нажатых кнопок обнволения собирать не будем
+    const message = ctx.channelPost ? ctx.channelPost : ctx.message;
+    if (message.photo) {
+        handlerMessages.messagePhoto(message, message.message_id, db);
+        return
+    };
+    if (message.animation) {
+        handlerMessages.messageAnimation(message, message.message_id, db);
+        return
+    }
+    if (message.text) {
+        handlerMessages.messageText(message, message.message_id, db);
+        return
+    }
+    if (message.video) {
+        handlerMessages.messageVideo(message, message.message_id, db);
+        return
+    }
+    if (message.video_note) {
+        handlerMessages.messageVideoNote(message, message.message_id, db);
+        return
+    }
+    if (message.voice) {
+        handlerMessages.messageVoiceNote(message, message.message_id, db);
+        return
+    }
+    if (message.audio) {
+        handlerMessages.messageAudio(message, message.message_id, db);
+        return
+    }
+    
 }
 
 module.exports = {

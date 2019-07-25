@@ -48,7 +48,17 @@ const chatSchema = new mongoose.Schema({
             links: {type: Boolean, default: false},
             photo: {type: Boolean, default: false},
             video: {type: Boolean, default: false},
+            audio: {type: Boolean, default: false},
             all: {type: Boolean, default: true}
+        },
+        content: {
+            links: {type: Object, default: {}},
+            photo: {type: Object, default: {}},
+            animation: {type: Object, default: {}},
+            video: {type: Object, default: {}},
+            audio: {type: Object, default: {}},
+            voicenote: {type: Object, default: {}},
+            videonote: {type: Object, default: {}},
         },
         resourseActive: {type: Boolean, default: false},
         listening: {type: Number, default: 0},

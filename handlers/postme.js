@@ -1,6 +1,6 @@
 const Scene = require('telegraf/scenes/base');
 const {Random} = require('random-js');
-const {postmeMongoListener, } = require('../utils/mongoListener');
+const {postmeMongoListener, } = require('../utils/mongoDB/mongoListener');
 const serviceMsg = require('../models/serviceMsg');
 
 const random = new Random();
@@ -8,7 +8,6 @@ const random = new Random();
 const mess = {};
 
 const replys = (ctx, params) => { // main
-    
     const channPostTrue = ctx.channelPost ? (ctx.channelPost.text.slice(8)).toLowerCase() : false;
 
     postmeMongoListener(ctx, {getPost: 'getMediatypes'})
@@ -33,12 +32,56 @@ const replys = (ctx, params) => { // main
             mess['message_id'] = ctx_then.message_id;
         })
         .catch(err => console.log(err));
+        return;
+    };
+    if (params === 'more') {
+        ctx.answerCbQuery();
+        const message_id = ctx.callbackQuery.message.message_id;
+        const chatId = ctx.chat.id;
+        ctx.state.redis.get('chatsPostme', (err, result) => {
+            if (err) {
+                console.log(err);
+                return
+            };
+            const chatInstance = JSON.parse(result);
+
+            if (ctx.callbackQuery.message.text || ctx.callbackQuery.message.voice || ctx.callbackQuery.message.video_note) { // Если предыдущее сообщение было текстом, затрём его
+                ctx.telegram.sendPhoto(ctx.chat.id, "AgADAgADUqoxG20y4Ut_lakMhc0CcjlChA8ABKUBUKdVPqKLC6IBAAEC")
+                    .then(ctx_then => {
+                        ctx.telegram.deleteMessage(ctx.chat.id, ctx.callbackQuery.message.message_id);
+                        chatInstance[chatId] = ctx_then.message_id;
+                        ctx.state.correctChat = {chatId: ctx_then.chat.id, messageId: chatInstance[chatId]};
+                        ctx.state.redis.set("chatsPostme", JSON.stringify(chatInstance));
+                        getPost(ctx);
+                    });
+                    
+                return;
+            };
+            chatInstance[chatId] = message_id;
+            ctx.state.correctChat = {chatId: chatId, messageId: chatInstance[chatId]};;
+            ctx.state.redis.set("chatsPostme", JSON.stringify(chatInstance));
+            getPost(ctx);
+        });
+        
+        return
     } else {
-        ctx.telegram.sendPhoto(ctx.chat.id, "AgADAgADmqsxG6B52Uvte645Hdut8HBEhA8ABBk7vbRH9WCIXJ8BAAEC")
+        const redisClient = ctx.state.redis;
+        ctx.telegram.sendPhoto(ctx.chat.id, "AgADAgADUqoxG20y4Ut_lakMhc0CcjlChA8ABKUBUKdVPqKLC6IBAAEC")
             .then( ctx_then => {
-                timer.wait(ctx_then, ctx);
-                getPost(ctx);
-            });        
+                if (!redisClient) return;
+                redisClient.get('chatsPostme', (err, result) => {
+                    if (err) {
+                        console.log(err);
+                        return
+                    };
+                    const chatInstance = JSON.parse(result);
+                    chatInstance[ctx.chat.id] = ctx_then.message_id;
+                    ctx.state.correctChat = {chatId: ctx.chat.id, messageId: chatInstance[ctx.chat.id]};
+                    redisClient.set("chatsPostme", JSON.stringify(chatInstance));
+                    getPost(ctx);
+                })
+            });
+        return;
     };
 };
 
@@ -112,7 +155,7 @@ const selectedSource = (ctx, resource) => {
 
 const typeSource = (ctx, msgType) => {
     const cbButtons = [[{ text: `🖼 Фото ${checkBox(msgType.photo)}`, callback_data: 'typeSource:photo', hide: false }, { text: `🎥 Видео/GIF ${checkBox(msgType.video)}`, callback_data: 'typeSource:video', hide: false },{ text: `🔗 Ссылки ${checkBox(msgType.links)}`, callback_data: 'typeSource:links', hide: false }],
-                [{ text: `♾ Любой ${checkBox(msgType.all)}`, callback_data: 'typeSource:all', hide: false }],
+                [{ text: `♾ Любой ${checkBox(msgType.all)}`, callback_data: 'typeSource:all', hide: false }, { text: `🎵 Аудио ${checkBox(msgType.audio)}`, callback_data: 'typeSource:audio', hide: false }],
                 [{ text: `🔰 Выход 🔰`, callback_data: 'deleteThisMsg', hide: false }]
     ];
     const customExtra = { reply_markup: {inline_keyboard: cbButtons}, parse_mode: 'HTML'};
@@ -172,31 +215,111 @@ function checkBox(bool) {
     return bool === true ? '✅' : '⬜️'
 
 }
-const timer = {
-    wait: (ctx_then, ctx) => {
-        const startDate = new Date(Date.UTC(2019, 0, 1));
-        this.ctx_then = ctx_then;
-        /* this.waitTime = setInterval(() => {
-            startDate.setSeconds(startDate.getSeconds() + 1);
-            let minutes = String(new Date(startDate).getMinutes());
-            let seconds = String(new Date(startDate).getSeconds());
-            if (minutes.length < 2 || seconds.length < 2) {
-                minutes = minutes.length < 2 ?  "0" + minutes : minutes;
-                seconds = seconds.length < 2 ?  "0" + seconds : seconds;
-            };
-            const message = `Ожидайте, прошло времени ${minutes}:${seconds}`;
-            ctx.telegram.editMessageText(this.ctx_then.chat.id, this.ctx_then.message_id, null, message);
-        }, 1000); */
+const messageHandler = {
+    wait: (message_id, ctx) => {
+        this.message_id = message_id;
     },
-    send: (ctx, media) => {
+    send: (ctx, media, messageType) => {
+        const correctChatId = ctx.state.correctChat ? ctx.state.correctChat.chatId : ctx.chat.id;
+        const chatId = ctx.chat.id === correctChatId ? ctx.chat.id : correctChatId || ctx.chat.id; // проверка на контектсный chatID или пересланный из буфера
+        const redirectMessage = chatId === ctx.chat.id ? true : false; // необходимо ли перенаправляьт сообщение
+        const messageId = ctx.state.correctChat ? ctx.state.correctChat.messageId : false;
+
+
         const extra = {reply_markup:
-            {inline_keyboard: [ [ { text: '🔄 Еще', callback_data: 'getSource', hide: false } ] ] }
+            {inline_keyboard: [ [ { text: '🔄 Еще', callback_data: 'getSource:more', hide: false } ] ] }
         };
-        ctx.telegram.editMessageMedia(ctx.chat.id, this.ctx_then.message_id, null, media, extra);
+        if (messageType === 'links') {
+            ctx.telegram.sendMessage (correctChatId, media, extra)
+                .then( ctx_then => {
+                    ctx.telegram.deleteMessage(chatId, messageId);
+                    messageHandler.modifyMessageId(ctx, correctChatId, ctx_then.message_id);
+                })
+            return
+        }
+        if (messageType === 'photo') {
+            const photoId = (media[ media.length - 1].fileId ) || (media[ media.length - 1].file_id);
+            if (redirectMessage) {
+                messageHandler.redirect(ctx, photoId, 'inputMessagePhoto', messageId);
+                return;
+            };
+            ctx.telegram.editMessageMedia(chatId, messageId, null, {type: 'photo', media: photoId}, extra);
+            return;
+        }
+        if (messageType === 'animation') {
+            if (redirectMessage) {
+                messageHandler.redirect(ctx, media.fileId, 'inputMessageAnimation', messageId);
+                return;
+            };
+            ctx.telegram.editMessageMedia(chatId, messageId, null, {type: 'animation', media}, extra);
+            return;
+        }
+        if (messageType === 'video') {
+            if (redirectMessage) {
+                messageHandler.redirect(ctx, media.fileId, 'inputMessageVideo', messageId);
+                return;
+            };
+            ctx.telegram.editMessageMedia(chatId, messageId, null, {type: 'video', media}, extra);
+            return;
+        }
+        if (messageType === 'audio') {
+            if (redirectMessage) {
+                messageHandler.redirect(ctx, media.fileId, 'inputMessageAudio', messageId);
+                return;
+            };
+            ctx.telegram.editMessageMedia(chatId, messageId, null, {type: 'audio', media}, extra);
+            return
+        }
+        if (messageType === 'voicenote' || messageType === 'voice_note') {
+            if (redirectMessage) {
+                messageHandler.redirect(ctx, media, 'inputMessageVoiceNote', messageId);
+                return;
+            };
+            
+            ctx.telegram.sendVoice(chatId, media, extra)
+                .then( ctx_then => {
+                    ctx.telegram.deleteMessage(chatId, messageId);
+                    messageHandler.modifyMessageId(ctx, correctChatId, ctx_then.message_id);
+                })
+            return
+        }
+        if (messageType === 'videonote' || messageType === 'video_note') {
+            if (redirectMessage) {
+                messageHandler.redirect(ctx, media, 'inputMessageVideoNote', messageId);/* "DQADAgADSAADk40ISjP78en-josaAg" */
+                return;
+            };
+            
+            ctx.telegram.sendVideoNote(chatId, media, extra)
+                .then( ctx_then => {
+                    ctx.telegram.deleteMessage(chatId, messageId);
+                    messageHandler.modifyMessageId(ctx, correctChatId, ctx_then.message_id);
+                })
+            return
+        }
+        return
+    
+        /* ctx.telegram.editMessageMedia(ctx.chat.id, this.message_id, null, media, extra); */
         return;
     },
-    delMsg: () => {
-        ctx.telegram.deleteMessage(this.ctx_then.message_id);
+    redirect: (ctx, media, type, messageId) => {
+        const chatId = ctx.chat.id;
+        const message = `@sendMessage={"chatID":${chatId}, "fileId": "${media}", "type": "${type}", "messageId": ${messageId}}`;
+        ctx.telegram.sendMessage ( process.env.SHEN_VISOR, message );
+        return
+
+    },
+    modifyMessageId: (ctx, correctChatId, messageId) => {
+        ctx.state.redis.get('chatsPostme', (err, result) => {
+            if (err) {
+                console.log(err);
+                return
+            };
+            const chatInstance = JSON.parse(result);
+            chatInstance[correctChatId] = messageId;
+            ctx.state.correctChat = {chatId: correctChatId, messageId: messageId};
+            ctx.state.redis.set("chatsPostme", JSON.stringify(chatInstance));
+        })
+        return
     },
     
 };
@@ -205,11 +328,26 @@ function delCommandMsg(ctx) {
     return ctx.message === undefined ? ctx.channelPost.message_id : ctx.message.message_id;
 };
 
-let bue;
-function getPost (ctx) {
+
+function getPost (ctx, params) {
+    if (params) {
+        if (!ctx.message.caption && ctx.message.video_note) {
+            contentFilter(ctx, 'videonote');
+            return;
+        };
+        const {chatId: correctChatId, type: typeMessage} = JSON.parse(ctx.message.caption); // возмлжна вставкка на проверку чатов в списке
+        if (correctChatId === ctx.state.correctChat.chatId) {
+            const content = typeMessage;
+            contentFilter(ctx, content);
+            return;
+        }
+        return;
+    };
     postmeMongoListener(ctx, {getPost: 'sendPost'})
         .then( result => {
             if (typeof(result) === 'string') {
+                const messageId = ctx.channelPost ? ctx.channelPost.message_id + 1 : ctx.message.message_id + 1; // удалим ждуна, так как ждать нечего
+                ctx.deleteMessage(messageId);
                 ctx.reply(result, {parse_mode: 'HTML'})
                     .then(ctx_then => {
                         setTimeout(() => {
@@ -217,76 +355,111 @@ function getPost (ctx) {
                         }, 1000 * 15);
                     }) 
             } else {
-                const messageId = random.integer(1, result.maxMsgId);
-                ctx.telegram.forwardMessage(process.env.BUFFER_CHAN, result.chatID, messageId, {disable_notification: true})
-                    .then(messeg => {
-                        contentFilter(ctx, result, messeg);
-                        if (bue) {
-                            clearTimeout(bue)
-                        };
-                        return;
-                    })
-                    .catch(err => {
-                        if (err.code == 429) {
-                            ctx.reply(`Что то пошло не так, эту команду можно повторить через ${err.parameters.retry_after} секунд!`);
-                        };
-                        if (err.message == '400: Bad Request: message to forward not found') {
-                            bue = setTimeout( () => {
-                                getPost(ctx)
-                            }, 50)
-                        } else {
-                            ctx.answerCbQuery(ctx.callbackQuery.id, 'Этот опрос не актуален', false);
-                            console.log(err)
-                        };
-                        return;
-                    });
+                const content = result;
+                contentFilter(ctx, content)
             };
         });
 
-}        
-function contentFilter(ctx, result, message) {
-    const messageId = message.forward_from_message_id;
+}       
 
-    if (mess.currentTypes.all) {
-        timer.stop(ctx);
-        ctx.telegram.forwardMessage(ctx.chat.id, result.chatID, messageId);
-        return;
-    };
+function contentFilter(ctx, content) {
+    const availableTypes = Object.keys(content).slice(1);
+    let correctContent,
+        media,
+        messageType; 
+    const message = ctx.callbackQuery ? ctx.callbackQuery.message : ctx.message;
 
-    if (mess.currentTypes.photo && message.photo) {
-        let photo = message.photo[3] ? message.photo[3].file_id
-            : message.photo[2] ? message.photo[2].file_id
-            : message.photo[1] ? message.photo[1].file_id : message.photo[0].file_id;
-        photo = {type: "photo", media: photo};
-        timer.send(ctx, photo);
-        return;
-    };
-    if (mess.currentTypes.video && (message.video || message.document || message.video_note)) {
-
-        if (message.video) {
-            const video = {type: "video", media: message.video.file_id};
-            timer.send(ctx, video);
+    if (content.photo) { // провеерка на объект
+        correctContent = generateContent(content, mess);
+        media = correctContent.content;
+        messageType = correctContent.messageType;
+    }
+    
+    if (content === 'links' || messageType === 'links') {
+        if (!media) {
+            media = message.text;
         };
-        if (message.document) {
-            const video = {type: "document", media: message.document.file_id};
-            timer.send(ctx, video);
-        };
-        if (message.video_note) {
-            timer.delMsg();
-            const video = message.video_note.file_id;
-            ctx.telegram.sendVideoNote(ctx.chat.id, video);
-        };
+        messageHandler.send( ctx, media, messageType || content );
+        return;
+    };
 
+    if (content === 'audio' || messageType === 'audio') {
+        if (!media) {
+            media = message.audio.file_id;
+        };
+        messageHandler.send( ctx, media, messageType || content );
         return;
     };
-    if (mess.currentTypes.links) {
-        ctx.telegram.forwardMessage(ctx.chat.id, result.chatID, messageId);
+
+    if (content === 'voicenote' || messageType === 'voicenote') {
+        if (!media) {
+            media = message.voice.file_id;
+        };
+        messageHandler.send( ctx, media, messageType || content );
         return;
     };
-    getPost(ctx);
+
+    if (content === 'animation' || messageType === 'animation') {
+        if (!media) {
+            media = message.animation.file_id;
+        };
+        messageHandler.send( ctx, media, messageType || content );
+        return;
+    };
+
+    if (content === 'video' || messageType === 'video') {
+        if (!media) {
+            media = message.video.file_id;
+        };
+        messageHandler.send( ctx, media, messageType || content );
+        return;
+    };
+
+    if (content === 'photo' || messageType === 'photo') {
+        if (!media) {
+            media = message.photo;
+        };
+        messageHandler.send( ctx, media, messageType || content );
+        return;
+    };
+
+    if (content === 'videonote' || messageType === 'videonote') {
+        if (!media) {
+            media = message.video_note.file_id;
+        };
+        messageHandler.send( ctx, media, messageType || content );
+        return;
+    };
+    
     return;
+    
+    function generateContent(content, mess) {
+        let messageCategory = Object.entries(mess.currentTypes)
+            .map((currentItem) => {
+                if (currentItem[0] !== '$init' && currentItem[1] === true) {
+                    return currentItem[0];
+                };
+                return
+            })
+            .filter(item => {
+                if (item !== undefined) {
+                    return item
+                }
+            });
+        messageCategory = messageCategory[ random.integer(0, messageCategory.length - 1) ]; // если несколько выбранных категорий, выберим одну
+        const messageTypes = {
+            'photo': 'photo',
+            'video': [ 'video', 'videonote', 'animation'][ random.integer(0, 2) ],
+            'links': 'links',
+            'audio': [ 'audio', 'voicenote' ][ random.integer(0, 1) ],
+            'all': [ 'links', 'photo', 'animation', 'video', 'audio', 'voicenote', 'videonote'][ random.integer(0, 6) ]
+        };
+        const messageType = messageTypes[messageCategory];
+        const unsortedContent = content[ messageType ];
+        const returnedContent = unsortedContent[ Object.keys(unsortedContent)[ random.integer(0, Object.keys(unsortedContent).length -1) ] ];
+        return {messageType, content: returnedContent};
+    };
 };
-
 
 module.exports = {
     replys,

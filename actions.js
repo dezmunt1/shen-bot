@@ -1,5 +1,5 @@
 const Router = require('telegraf/router');
-const {respectMongoListener, postmeMongoListener} = require('./utils/mongoListener');
+const {respectMongoListener, postmeMongoListener} = require('./utils/mongoDB/mongoListener');
 const {setSource, delSource, selectSource, selectedSource, replys, typeSource, getPost} = require('./handlers/postme');
 const {sendFutureScene, enteringText} = require('./handlers/delorian');
 
@@ -66,7 +66,12 @@ callbackQuerys.on('selectedSource', (ctx) => {
 });
 callbackQuerys.on('setSource', (ctx) => {
     try {
-        setSource(ctx);
+        if (ctx.chat.type !== 'private') {
+            setSource(ctx);
+            return
+        };
+        ctx.reply('У вас приватная группа, добавьте к себе в группу @shen_visor');
+        
     } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
         ctx.answerCbQuery('Этот опрос не актуален', false);
     };
@@ -74,8 +79,7 @@ callbackQuerys.on('setSource', (ctx) => {
 callbackQuerys.on('getSource', (ctx) => {
     try {
         const resource = ctx.state.cbParams;
-        getPost(ctx, resource);
-        ctx.answerCbQuery('Ищу новый контент', false);
+        replys(ctx, resource);
     } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
         ctx.answerCbQuery('Этот опрос не актуален', false);
     };

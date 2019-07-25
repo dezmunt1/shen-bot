@@ -1,7 +1,7 @@
 
 const fs = require('fs');
 const Extra = require('telegraf/extra');
-const {articleMongoListener} = require('../utils/mongoListener');
+const {articleMongoListener} = require('../utils/mongoDB/mongoListener');
 const articleParser = require('../utils/articleParser')
 
 function random(arr) {
