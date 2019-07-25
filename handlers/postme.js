@@ -457,6 +457,10 @@ function contentFilter(ctx, content) {
         const messageType = messageTypes[messageCategory];
         const unsortedContent = content[ messageType ];
         const returnedContent = unsortedContent[ Object.keys(unsortedContent)[ random.integer(0, Object.keys(unsortedContent).length -1) ] ];
+        // Если контент еще не подгрузился в базу, добвим заглушку с кнопкой "ЕЩЕ"
+        if (!returnedContent) {
+            return {messageType: "photo", content: [{caption:false, fileId: "AgADAgADUasxG0DM0EnjG3eTgcJky7RKhA8ABBPisIHPGjR9HZcDAAEC", size: "small"}]};
+        }
         return {messageType, content: returnedContent};
     };
 };
