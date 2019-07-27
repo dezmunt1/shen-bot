@@ -331,6 +331,7 @@ function delCommandMsg(ctx) {
 
 function getPost (ctx, params) {
     if (params) {
+        if (!ctx.state.correctChat) return;
         if (!ctx.message.caption && ctx.message.video_note) {
             contentFilter(ctx, 'videonote');
             return;
