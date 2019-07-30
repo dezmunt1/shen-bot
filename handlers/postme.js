@@ -460,7 +460,7 @@ function contentFilter(ctx, content) {
         const returnedContent = unsortedContent[ Object.keys(unsortedContent)[ random.integer(0, Object.keys(unsortedContent).length -1) ] ];
         // Если контент еще не подгрузился в базу, добвим заглушку с кнопкой "ЕЩЕ"
         if (!returnedContent) {
-            return {messageType: "animation", content: {caption: false, fileId: "CgADAgADWgMAAs2k4UleoIPJ9cCfkxYE"}};
+            return {messageType: "animation", content: {caption: false, fileId: "CgADAgADWgMAAs2k4Ul-_jKdAeD-_QI"}};
         }
         return {messageType, content: returnedContent};
     };
