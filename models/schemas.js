@@ -43,6 +43,7 @@ const chatSchema = new mongoose.Schema({
     chatType: String,
     username: String,
     maxMsgId: Number,
+    private: Boolean,
     postme: {
         mediaTypes: {
             links: {type: Boolean, default: false},

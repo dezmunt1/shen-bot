@@ -20,7 +20,7 @@
     "random-js": "^2.0.0",
     "redis": "^2.8.0",
     "rss-parser": "^3.7.0",
-    "telegraf": "^3.27.1",
+    "telegraf": "^3.32.0",
     "telegraf-ratelimit": "^2.0.0",
     "telegraf-session-redis": "^5.1.0"
   }

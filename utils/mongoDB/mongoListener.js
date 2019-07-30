@@ -257,17 +257,30 @@ const postmeMongoListener = function(ctx, params) {
 
     if (params.adding) {
         return new Promise( (resolve, rej) => {
-            ChatModel.findOne({chatID: ctx.chat.id, "postme.resourseActive": false}, (err, res) =>{
+            ChatModel.findOne({chatID: ctx.chat.id}, (err, res) =>{ // "postme.resourseActive": false}
                 if (err) {console.log(err); return};
-                if (res === null) {
-                    resolve(true)
+                if (params.privateProblem) {
+                    res.postme.resourseActive = false;
+                    res.markModified('postme');
+                    res.save((err, data)=>{
+                        if (err) console.error(err);
+                        resolve(`Данная группа приватная, для добавления её в базу, добавьте к себе пользователя ${process.env.NAME_SHEN_VISOR}`);
+                    });
+                    return;
+                }
+                if (res.postme.resourseActive === true) {
+                    resolve(`Чат уже в базе данных`);
+                    return;
+                };
+                if (res.private === true) {
+                    resolve(`Данная группа приватная, для добавления её в базу, добавьте к себе пользователя ${process.env.NAME_SHEN_VISOR}`);
                     return;
                 };
                 res.postme.resourseActive = true;
                 ctx.telegram.sendMessage(process.env.SHEN_VISOR, `@scrapChat={"chatID":${res.chatID}, "maxMsgId":${res.maxMsgId}}`)
                 res.save((err)=>{
                     if (err) console.error(err);
-                    resolve(false);
+                    resolve('Чат добавлен в базу данных');
                 });
             });
         
@@ -308,8 +321,10 @@ const postmeMongoListener = function(ctx, params) {
 
 const addChatMongoListener = function(chat, ctx) {
     return new Promise( (resolve, rej) => {
-        ChatModel.findOne({chatID: chat.id}, (err, res) =>{
+        ChatModel.findOne({chatID: chat.id}, async (err, res) =>{
             if (err) {console.log(err); return};
+            let privateOrNot = await ctx.getChat();
+            privateOrNot = privateOrNot.username ? false : true;
             if (res === null) {
                 const newChat = new ChatModel({
                     chatID: chat.id,
@@ -319,6 +334,7 @@ const addChatMongoListener = function(chat, ctx) {
                     chatType: chat.type,
                     username: chat.username || 'Без имени',
                     maxMsgId: returnMsgId(ctx),
+                    private: privateOrNot,
                     listening: [],   
                 });
                 newChat.save((err, futureMessage)=>{
@@ -332,6 +348,7 @@ const addChatMongoListener = function(chat, ctx) {
                 res.title = chat.title;
                 res.chatType = chat.type;
                 res.username = chat.username || 'Без имени';
+                res.private = privateOrNot;
                 if (returnMsgId(ctx)) {
                     res.maxMsgId = returnMsgId(ctx);
                 };

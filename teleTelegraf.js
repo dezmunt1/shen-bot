@@ -7,6 +7,7 @@ const MongoInit = require('./utils/mongoDB/mongoInit');
 const actions = require('./actions');
 const {dlMongoListener, articleMongoListener, addChatMongoListener, userMongoListener} = require('./utils/mongoDB/mongoListener');
 const tmzEditor = require('./utils/tmzEditor');
+const errorHandler = require('./utils/errorHandler');
 const {etiquette, weatherApp, getArticle, delorian, respect, postme} = require('./handlers');
 
 const redisClient = redis.createClient()
@@ -107,6 +108,11 @@ bot.hears(/\/respect (.+)/, (ctx) => {
 bot.hears(/\/tmz\s(.+)/, (ctx) => {
   tmzEditor(ctx);
 });
+bot.hears(/^@error/, (ctx) => {
+  let message = (ctx.message.text).split('=')[1];
+  message = JSON.parse(message);
+  errorHandler(message, ctx);
+});
 
 bot.command('help', ctx => {
   ctx.reply(`
@@ -117,7 +123,7 @@ bot.command('help', ctx => {
   1. <code>/delorian</code> - отправить сообщение в будущее (напоминалка).\n
   2. <code>/respect</code> <i>текс</i> - лайки и дизлайки к <i>тексту</i>.\n
   3. <code>Статья</code> <i>ресурс</i> - для запроса свежей рандомной статьи (вбей вместо <i>ресурса</i> "список" или "list" – для получения перечня ресурсов).\n
-  4. <code>/postme</code> - рандомный контент из доступного списка групп и каналов, в меню настроек можешь добавить свою группу\\канал как источник, тем самым делясь контентом с другими. Для настройки пиши "/postme options". Если у вас приватная группа, то добавьте в нее @shen_visor, он поможет боту отработать корректно!\n
+  4. <code>/postme</code> - рандомный контент из доступного списка групп и каналов, в меню настроек можешь добавить свою группу\\канал как источник, тем самым делясь контентом с другими. Для настройки пиши "/postme options". Если у вас приватная группа, то добавьте в нее ${process.env.NAME_SHEN_VISOR}, он поможет боту отработать корректно!\n
   По всем вопросам и предложениям к @dezamat .
   `, Telegraf.Extra.HTML(true));
 })

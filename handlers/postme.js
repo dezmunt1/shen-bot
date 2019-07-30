@@ -120,7 +120,7 @@ const selectSource = (ctx) => {
 const setSource = (ctx) => {   
     postmeMongoListener(ctx, {adding: true})
         .then( (res) => { 
-            const message = res === true ? `Чат уже в базе данных` : 'Чат добавлен в базу данных';
+            const message = res;
             
             ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, message )
                 .then(ctx_then => {
@@ -331,12 +331,12 @@ function delCommandMsg(ctx) {
 
 function getPost (ctx, params) {
     if (params) {
-        if (!ctx.state.correctChat) return;
+        if (!ctx.state.correctChat) return; // если бот был перезапущен с каким-нибудь состоянием, сброс
         if (!ctx.message.caption && ctx.message.video_note) {
             contentFilter(ctx, 'videonote');
             return;
         };
-        const {chatId: correctChatId, type: typeMessage} = JSON.parse(ctx.message.caption); // возмлжна вставкка на проверку чатов в списке
+        const {chatId: correctChatId, type: typeMessage} = JSON.parse(ctx.message.caption || "{}"); // возмлжна вставкка на проверку чатов в списке
         if (correctChatId === ctx.state.correctChat.chatId) {
             const content = typeMessage;
             contentFilter(ctx, content);
@@ -460,7 +460,7 @@ function contentFilter(ctx, content) {
         const returnedContent = unsortedContent[ Object.keys(unsortedContent)[ random.integer(0, Object.keys(unsortedContent).length -1) ] ];
         // Если контент еще не подгрузился в базу, добвим заглушку с кнопкой "ЕЩЕ"
         if (!returnedContent) {
-            return {messageType: "photo", content: [{caption:false, fileId: "AgADAgADUasxG0DM0EnjG3eTgcJky7RKhA8ABBPisIHPGjR9HZcDAAEC", size: "small"}]};
+            return {messageType: "animation", content: {caption: false, fileId: "CgADAgADWgMAAs2k4UleoIPJ9cCfkxYE"}};
         }
         return {messageType, content: returnedContent};
     };
