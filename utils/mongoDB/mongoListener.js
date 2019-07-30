@@ -257,7 +257,7 @@ const postmeMongoListener = function(ctx, params) {
 
     if (params.adding) {
         return new Promise( (resolve, rej) => {
-            ChatModel.findOne({chatID: ctx.chat.id}, (err, res) =>{ // "postme.resourseActive": false}
+            ChatModel.findOne({chatID: ctx.chat.id}, async (err, res) =>{ // "postme.resourseActive": false}
                 if (err) {console.log(err); return};
                 if (params.privateProblem) {
                     res.postme.resourseActive = false;
@@ -272,7 +272,8 @@ const postmeMongoListener = function(ctx, params) {
                     resolve(`Чат уже в базе данных`);
                     return;
                 };
-                if (res.private === true) {
+                const userbotInGroup = await ctx.telegram.getChatMember(ctx.chat.id, process.env.SHEN_VISOR);
+                if ( res.private === true && (userbotInGroup.status === "left" || userbotInGroup.status === "kicked") ) {
                     resolve(`Данная группа приватная, для добавления её в базу, добавьте к себе пользователя ${process.env.NAME_SHEN_VISOR}`);
                     return;
                 };
