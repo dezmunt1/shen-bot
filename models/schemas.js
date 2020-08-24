@@ -10,10 +10,10 @@ const articleSchema = new mongoose.Schema({
 const delorianSchema = new mongoose.Schema({
     chatId: Number,
     userId: Number,
-    messageId: Number,
-    remindTime: String,
+    remindTime: Date,
     text: String,
-    performed: Boolean
+    performed: Boolean,
+    gmt: Number
 });
 
 const respectSchema = new mongoose.Schema({
@@ -32,7 +32,7 @@ const userSchema = new mongoose.Schema({
     userId: Number,
     isBot: Boolean,
     lang: {type: String, default: 'en'},
-    gmt: {type: String, default: '+3'}
+    gmt: {type: Number, default: 3}
 });
 
 const chatSchema = new mongoose.Schema({
@@ -53,13 +53,13 @@ const chatSchema = new mongoose.Schema({
             all: {type: Boolean, default: true}
         },
         content: {
-            links: {type: Object, default: {}},
-            photo: {type: Object, default: {}},
-            animation: {type: Object, default: {}},
-            video: {type: Object, default: {}},
-            audio: {type: Object, default: {}},
-            voicenote: {type: Object, default: {}},
-            videonote: {type: Object, default: {}},
+            links: {type: Array, default: []},
+            photo: {type: Array, default: []},
+            animation: {type: Array, default: []},
+            video: {type: Array, default: []},
+            audio: {type: Array, default: []},
+            voicenote: {type: Array, default: []},
+            videonote: {type: Array, default: []},
         },
         resourseActive: {type: Boolean, default: false},
         listening: {type: Number, default: 0},

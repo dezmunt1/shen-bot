@@ -1,470 +1,222 @@
-const Scene = require('telegraf/scenes/base');
-const {Random} = require('random-js');
-const {postmeMongoListener, } = require('../utils/mongoDB/mongoListener');
-const serviceMsg = require('../models/serviceMsg');
+const { postmeMongoListener } = require('../utils/mongoDB/mongoListener');
+const { Extra } = require('telegraf');
 
-const random = new Random();
 
-const mess = {};
+const replys = async (ctx, params) => { // main
+    try {
+      const channPostTrue = ctx.channelPost ? (ctx.channelPost.text.slice(8)).toLowerCase() : false;
 
-const replys = (ctx, params) => { // main
-    const channPostTrue = ctx.channelPost ? (ctx.channelPost.text.slice(8)).toLowerCase() : false;
-
-    postmeMongoListener(ctx, {getPost: 'getMediatypes'})
-        .then(resolved => {
-            mess.currentTypes = resolved;
+      if ( params === 'receivingСontent' ) {
+        await ctx.reply('\u2060', {
+          reply_markup: { inline_keyboard: [
+            [{ text: '🔄 ЕЩЁ', callback_data: 'replyMore', hide: false}]
+          ]},
+          disable_notification: true
         });
+        return undefined;
+      }
+      if ( params === 'contentMore') {
+        ctx.telegram.deleteMessage( ctx.chat.id, correctMessageId(ctx) - 1 );
+      }
+      ctx.telegram.deleteMessage( ctx.chat.id, correctMessageId(ctx) );
+      
+      const welcomeToPostme = await ctx.replyWithSticker( process.env.WAIT_STICK );
+  
+      const mediaTypes = await postmeMongoListener( {chatId: welcomeToPostme.chat.id}, 'getMediatypes' );
 
-    if ((ctx.match && ctx.match[1].toLowerCase() === 'options') || params === 'options' || channPostTrue === 'options') {
-        ctx.deleteMessage( delCommandMsg(ctx) );
-        
-        ctx.reply('Настроим репостер ⚙', {reply_markup:
+      ctx.session.postme = {
+        chatId: welcomeToPostme.chat.id,
+        messageId: welcomeToPostme.message_id,
+        mediaTypes
+      }
+    
+      if ((ctx.match && ctx.match[1].toLowerCase() === 'options') || params === 'options' || channPostTrue === 'options') {
+        const { chatId, messageId } = ctx.session.postme;
+        ctx.deleteMessage(messageId);
+        const sendOptions = await ctx.reply( 'Настроим репостер ⚙', {reply_markup:
             {inline_keyboard: [
-                    [{ text: '📃 Откуда репостим', callback_data: 'selectSource', hide: false}],
-                    [{ text: '📌 Выбрать чат как источник', callback_data: 'setSource', hide: false}],
-                    [{ text: '✔️ Выбрать тип контента', callback_data: 'typeSource:current', hide: false }],
-                    [{ text: '🗑 Удалить чат из источников', callback_data: 'delSource', hide: false }]
-                ]
+                [{ text: '📃 Откуда репостим', callback_data: 'selectSource', hide: false}],
+                [{ text: '📌 Выбрать чат как источник', callback_data: 'setSource', hide: false}],
+                [{ text: '✔️ Выбрать тип контента', callback_data: 'typeSource:current', hide: false }],
+                [{ text: '🗑 Удалить чат из источников', callback_data: 'delSource', hide: false }]
+              ]
             }
-        }
-        ).then( ctx_then => {
-            mess['chat_id'] = ctx_then.chat.id;
-            mess['message_id'] = ctx_then.message_id;
-        })
-        .catch(err => console.log(err));
-        return;
-    };
-    if (params === 'more') {
-        ctx.answerCbQuery();
-        const message_id = ctx.callbackQuery.message.message_id;
-        const chatId = ctx.chat.id;
-        ctx.state.redis.get('chatsPostme', (err, result) => {
-            if (err) {
-                console.log(err);
-                return
-            };
-            const chatInstance = JSON.parse(result);
+          });
+          ctx.session.postme = {...ctx.session.postme, chatId: sendOptions.chat.id ,messageId: sendOptions.message_id};
+      };
 
-            if (ctx.callbackQuery.message.text || ctx.callbackQuery.message.voice || ctx.callbackQuery.message.video_note) { // Если предыдущее сообщение было текстом, затрём его
-                ctx.telegram.sendPhoto(ctx.chat.id, "AgADAgADra0xG09VCEqv6lrWIs0XmzH78Q4ABAEAAwIAA20AA-_gAQABFgQ")
-                    .then(ctx_then => {
-                        ctx.telegram.deleteMessage(ctx.chat.id, ctx.callbackQuery.message.message_id);
-                        chatInstance[chatId] = ctx_then.message_id;
-                        ctx.state.correctChat = {chatId: ctx_then.chat.id, messageId: chatInstance[chatId]};
-                        ctx.state.redis.set("chatsPostme", JSON.stringify(chatInstance));
-                        getPost(ctx);
-                    });
-                    
-                return;
-            };
-            chatInstance[chatId] = message_id;
-            ctx.state.correctChat = {chatId: chatId, messageId: chatInstance[chatId]};;
-            ctx.state.redis.set("chatsPostme", JSON.stringify(chatInstance));
-            getPost(ctx);
-        });
-        
-        return
-    } else {
-        const redisClient = ctx.state.redis;
-        ctx.telegram.sendPhoto(ctx.chat.id, "AgADAgADra0xG09VCEqv6lrWIs0XmzH78Q4ABAEAAwIAA20AA-_gAQABFgQ")
-            .then( ctx_then => {
-                if (!redisClient) return;
-                redisClient.get('chatsPostme', (err, result) => {
-                    if (err) {
-                        console.log(err);
-                        return
-                    };
-                    const chatInstance = JSON.parse(result);
-                    chatInstance[ctx.chat.id] = ctx_then.message_id;
-                    ctx.state.correctChat = {chatId: ctx.chat.id, messageId: chatInstance[ctx.chat.id]};
-                    redisClient.set("chatsPostme", JSON.stringify(chatInstance));
-                    getPost(ctx);
-                })
-            });
-        return;
-    };
-};
-
-const selectSource = (ctx) => {
-    postmeMongoListener(ctx, {selected: true})
-        .then( returned => {
-            let customExtra = {};
-            let message = '';
-            if (returned === false) {
-                message = '🤖Список ресурсов пуст!';
-                customExtra = {parse_mode: 'HTML'};
-            } else {
-                const cbButtons = genListResources(returned);
-                message = '<b>Выберите один из доступных ресурсов:</b>';
-                customExtra =  { reply_markup: {inline_keyboard: cbButtons}, parse_mode: 'HTML'};
-            };
-
-            ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, message , customExtra)
-                .then(ctx_then => {
-                    if (!returned) {
-                        setTimeout(() => {
-                            ctx.deleteMessage(ctx_then.message_id);
-                        }, 1000 * 15);
-                    }
-                    
-                })
-                .catch(err => {
-                    if (err.message === serviceMsg.cb400) {
-                        ctx.answerCbQuery('Этот опрос не актуален', false);
-                    }
-                    console.log(err);
-                })
-        })
-};
-
-const setSource = (ctx) => {   
-    postmeMongoListener(ctx, {adding: true})
-        .then( (res) => { 
-            const message = res;
-            
-            ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, message )
-                .then(ctx_then => {
-                    setTimeout(() => {
-                        ctx.deleteMessage(ctx_then.message_id);
-                    }, 1000 * 15);
-                })
-                .catch(err => {
-                    if (err.message === serviceMsg.cb400) {
-                        ctx.answerCbQuery('Этот опрос не актуален', false);
-                    }
-                    console.log(err);
-                })
-        }) 
-};
-
-const selectedSource = (ctx, resource) => {
-    postmeMongoListener(ctx, {listening: resource})
-        .then( returned => {
-            ctx.answerCbQuery(returned, true)
-                .then( () => {
-                    ctx.deleteMessage(ctx.callbackQuery.message.message_id);
-                });
-        })
-        .catch(err => {
-            if (err.message === serviceMsg.cb400) {
-                ctx.answerCbQuery('Этот опрос не актуален', false);
-            }
-            console.log(err);
-        })
-}
-
-const typeSource = (ctx, msgType) => {
-    const cbButtons = [[{ text: `🖼 Фото ${checkBox(msgType.photo)}`, callback_data: 'typeSource:photo', hide: false }, { text: `🎥 Видео/GIF ${checkBox(msgType.video)}`, callback_data: 'typeSource:video', hide: false },{ text: `🔗 Ссылки ${checkBox(msgType.links)}`, callback_data: 'typeSource:links', hide: false }],
-                [{ text: `♾ Любой ${checkBox(msgType.all)}`, callback_data: 'typeSource:all', hide: false }, { text: `🎵 Аудио ${checkBox(msgType.audio)}`, callback_data: 'typeSource:audio', hide: false }],
-                [{ text: `🔰 Выход 🔰`, callback_data: 'deleteThisMsg', hide: false }]
-    ];
-    const customExtra = { reply_markup: {inline_keyboard: cbButtons}, parse_mode: 'HTML'};
-    const message = 'Выберите какой контент вы готовы получать';
-
-    ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, message , customExtra)
-                .catch(err => {
-                    if (err.message === serviceMsg.err400_oldLink) {
-                        ctx.answerCbQuery('Этот опрос не актуален', false);
-                    };
-                    console.log(err);
-                })
-};
-
-const delSource = (ctx) => {
-    postmeMongoListener(ctx, {delete: true})
-    .then( (res) => { 
-        const message = res === true ? `Чат успешно удален` : 'Чата в источниках нет!';
-        
-        ctx.telegram.editMessageText(mess.chat_id, mess.message_id, null, message )
-            .then(ctx_then => {
-                setTimeout(() => {
-                    ctx.deleteMessage(ctx_then.message_id);
-                }, 1000 * 15);
-            })
-            .catch(err => {
-                if (err.message === serviceMsg.err400_oldLink) {
-                    ctx.answerCbQuery('Этот опрос не актуален', false);
-                }
-                console.log(err);
-            })
-    });
-};
-
-function genListResources(arr) {
-    const cbBtns = arr.map( resource => {
-        let resourseType = '';
-        switch (resource.chatType) {
-            case 'channel':
-                resourseType = '📣';
-                break;
-            case 'group':
-                resourseType = '🗣';
-                break;
-            case 'supergroup':
-                resourseType = '🗣';
-                break;
-            case 'private':
-                resourseType = '👩🏻‍💻';
-                break;
-        };
-        return [{ text: `${resourseType} ${resource.title || resource.username}`, callback_data: `selectedSource:${resource.chatID}`, hide: false}]
-    });
-    return cbBtns;
-}
-function checkBox(bool) {
-    return bool === true ? '✅' : '⬜️'
-
-}
-const messageHandler = {
-    wait: (message_id, ctx) => {
-        this.message_id = message_id;
-    },
-    send: (ctx, media, messageType) => {
-        const correctChatId = ctx.state.correctChat ? ctx.state.correctChat.chatId : ctx.chat.id;
-        const chatId = ctx.chat.id === correctChatId ? ctx.chat.id : correctChatId || ctx.chat.id; // проверка на контектсный chatID или пересланный из буфера
-        const redirectMessage = chatId === ctx.chat.id ? true : false; // необходимо ли перенаправляьт сообщение
-        const messageId = ctx.state.correctChat ? ctx.state.correctChat.messageId : false;
-
-
-        const extra = {reply_markup:
-            {inline_keyboard: [ [ { text: '🔄 Еще', callback_data: 'getSource:more', hide: false } ] ] }
-        };
-        if (messageType === 'links') {
-            ctx.telegram.sendMessage (correctChatId, media, extra)
-                .then( ctx_then => {
-                    ctx.telegram.deleteMessage(chatId, messageId);
-                    messageHandler.modifyMessageId(ctx, correctChatId, ctx_then.message_id);
-                })
-            return
-        }
-        if (messageType === 'photo') {
-            const photoId = (media[ media.length - 1].fileId ) || (media[ media.length - 1].file_id);
-            if (redirectMessage) {
-                messageHandler.redirect(ctx, photoId, 'inputMessagePhoto', messageId);
-                return;
-            };
-            ctx.telegram.editMessageMedia(chatId, messageId, null, {type: 'photo', media: photoId}, extra);
-            return;
-        }
-        if (messageType === 'animation') {
-            if (redirectMessage) {
-                messageHandler.redirect(ctx, media.fileId, 'inputMessageAnimation', messageId);
-                return;
-            };
-            ctx.telegram.editMessageMedia(chatId, messageId, null, {type: 'animation', media}, extra);
-            return;
-        }
-        if (messageType === 'video') {
-            if (redirectMessage) {
-                messageHandler.redirect(ctx, media.fileId, 'inputMessageVideo', messageId);
-                return;
-            };
-            ctx.telegram.editMessageMedia(chatId, messageId, null, {type: 'video', media}, extra);
-            return;
-        }
-        if (messageType === 'audio') {
-            if (redirectMessage) {
-                messageHandler.redirect(ctx, media.fileId, 'inputMessageAudio', messageId);
-                return;
-            };
-            ctx.telegram.editMessageMedia(chatId, messageId, null, {type: 'audio', media}, extra);
-            return
-        }
-        if (messageType === 'voicenote' || messageType === 'voice_note') {
-            if (redirectMessage) {
-                messageHandler.redirect(ctx, media, 'inputMessageVoiceNote', messageId);
-                return;
-            };
-            
-            ctx.telegram.sendVoice(chatId, media, extra)
-                .then( ctx_then => {
-                    ctx.telegram.deleteMessage(chatId, messageId);
-                    messageHandler.modifyMessageId(ctx, correctChatId, ctx_then.message_id);
-                })
-            return
-        }
-        if (messageType === 'videonote' || messageType === 'video_note') {
-            if (redirectMessage) {
-                messageHandler.redirect(ctx, media, 'inputMessageVideoNote', messageId);/* "DQADAgADSAADk40ISjP78en-josaAg" */
-                return;
-            };
-            
-            ctx.telegram.sendVideoNote(chatId, media, extra)
-                .then( ctx_then => {
-                    ctx.telegram.deleteMessage(chatId, messageId);
-                    messageHandler.modifyMessageId(ctx, correctChatId, ctx_then.message_id);
-                })
-            return
-        }
-        return
-    
-        /* ctx.telegram.editMessageMedia(ctx.chat.id, this.message_id, null, media, extra); */
-        return;
-    },
-    redirect: (ctx, media, type, messageId) => {
-        const chatId = ctx.chat.id;
-        const message = `@sendMessage={"chatID":${chatId}, "fileId": "${media}", "type": "${type}", "messageId": ${messageId}}`;
-        ctx.telegram.sendMessage ( process.env.SHEN_VISOR, message );
-        return
-
-    },
-    modifyMessageId: (ctx, correctChatId, messageId) => {
-        ctx.state.redis.get('chatsPostme', (err, result) => {
-            if (err) {
-                console.log(err);
-                return
-            };
-            const chatInstance = JSON.parse(result);
-            chatInstance[correctChatId] = messageId;
-            ctx.state.correctChat = {chatId: correctChatId, messageId: messageId};
-            ctx.state.redis.set("chatsPostme", JSON.stringify(chatInstance));
-        })
-        return
-    },
-    
-};
-
-function delCommandMsg(ctx) {
-    return ctx.message === undefined ? ctx.channelPost.message_id : ctx.message.message_id;
-};
-
-
-function getPost (ctx, params) {
-    if (params) {
-        if (!ctx.state.correctChat) return; // если бот был перезапущен с каким-нибудь состоянием, сброс
-        if (!ctx.message.caption && ctx.message.video_note) {
-            contentFilter(ctx, 'videonote');
-            return;
-        };
-        const {chatId: correctChatId, type: typeMessage} = JSON.parse(ctx.message.caption || "{}"); // возмлжна вставкка на проверку чатов в списке
-        if (correctChatId === ctx.state.correctChat.chatId) {
-            const content = typeMessage;
-            contentFilter(ctx, content);
-            return;
-        }
-        return;
-    };
-    postmeMongoListener(ctx, {getPost: 'sendPost'})
-        .then( result => {
-            if (typeof(result) === 'string') {
-                const messageId = ctx.channelPost ? ctx.channelPost.message_id + 1 : ctx.message.message_id + 1; // удалим ждуна, так как ждать нечего
-                ctx.deleteMessage(messageId);
-                ctx.reply(result, {parse_mode: 'HTML'})
-                    .then(ctx_then => {
-                        setTimeout(() => {
-                            ctx.deleteMessage(ctx_then.message_id);
-                        }, 1000 * 15);
-                    }) 
-            } else {
-                const content = result;
-                contentFilter(ctx, content)
-            };
-        });
-
-}       
-
-function contentFilter(ctx, content) {
-    const availableTypes = Object.keys(content).slice(1);
-    let correctContent,
-        media,
-        messageType; 
-    const message = ctx.callbackQuery ? ctx.callbackQuery.message : ctx.message;
-
-    if (content.photo) { // провеерка на объект
-        correctContent = generateContent(content, mess);
-        media = correctContent.content;
-        messageType = correctContent.messageType;
+      if ( ((params === 'content') || (params === 'contentMore')) && channPostTrue !== 'options' ) {
+        getPost(ctx, params);
+      }
+    } catch (error) {
+      console.error(error)
     }
-    
-    if (content === 'links' || messageType === 'links') {
-        if (!media) {
-            media = message.text;
-        };
-        messageHandler.send( ctx, media, messageType || content );
-        return;
-    };
-
-    if (content === 'audio' || messageType === 'audio') {
-        if (!media) {
-            media = message.audio.file_id;
-        };
-        messageHandler.send( ctx, media, messageType || content );
-        return;
-    };
-
-    if (content === 'voicenote' || messageType === 'voicenote') {
-        if (!media) {
-            media = message.voice.file_id;
-        };
-        messageHandler.send( ctx, media, messageType || content );
-        return;
-    };
-
-    if (content === 'animation' || messageType === 'animation') {
-        if (!media) {
-            media = message.animation.file_id;
-        };
-        messageHandler.send( ctx, media, messageType || content );
-        return;
-    };
-
-    if (content === 'video' || messageType === 'video') {
-        if (!media) {
-            media = message.video.file_id;
-        };
-        messageHandler.send( ctx, media, messageType || content );
-        return;
-    };
-
-    if (content === 'photo' || messageType === 'photo') {
-        if (!media) {
-            media = message.photo;
-        };
-        messageHandler.send( ctx, media, messageType || content );
-        return;
-    };
-
-    if (content === 'videonote' || messageType === 'videonote') {
-        if (!media) {
-            media = message.video_note.file_id;
-        };
-        messageHandler.send( ctx, media, messageType || content );
-        return;
-    };
-    
-    return;
-    
-    function generateContent(content, mess) {
-        let messageCategory = Object.entries(mess.currentTypes)
-            .map((currentItem) => {
-                if (currentItem[0] !== '$init' && currentItem[1] === true) {
-                    return currentItem[0];
-                };
-                return
-            })
-            .filter(item => {
-                if (item !== undefined) {
-                    return item
-                }
-            });
-        messageCategory = messageCategory[ random.integer(0, messageCategory.length - 1) ]; // если несколько выбранных категорий, выберим одну
-        const messageTypes = {
-            'photo': 'photo',
-            'video': [ 'video', 'videonote', 'animation'][ random.integer(0, 2) ],
-            'links': 'links',
-            'audio': [ 'audio', 'voicenote' ][ random.integer(0, 1) ],
-            'all': [ 'links', 'photo', 'animation', 'video', 'audio', 'voicenote', 'videonote'][ random.integer(0, 6) ]
-        };
-        const messageType = messageTypes[messageCategory];
-        const unsortedContent = content[ messageType ];
-        const returnedContent = unsortedContent[ Object.keys(unsortedContent)[ random.integer(0, Object.keys(unsortedContent).length -1) ] ];
-        // Если контент еще не подгрузился в базу, добвим заглушку с кнопкой "ЕЩЕ"
-        if (!returnedContent) {
-            return {messageType: "animation", content: {caption: false, fileId: "CgADAgADWgMAAs2k4Ul-_jKdAeD-_QI"}};
-        }
-        return {messageType, content: returnedContent};
-    };
 };
+
+const selectSource = async (ctx) => {
+  try {
+    const { chatId, messageId } = ctx.session.postme;
+    const activeResourses = await postmeMongoListener(null, 'selectSource');
+    const customExtra = {};
+    let message = '';
+    if ( !activeResourses ) {
+      message = '🤖Список ресурсов пуст!';
+      customExtra.parse_mode = 'HTML';
+    } else {
+      const cbButtons = genListResources(activeResourses);
+      message = '<b>Выберите один из доступных ресурсов:</b>';
+      Object.defineProperties( customExtra, {
+        'reply_markup': {
+          value: { 'inline_keyboard': cbButtons },
+          enumerable: true
+        },
+        'parse_mode': {
+          value: 'HTML',
+          enumerable: true
+        }
+      })
+    };
+
+    await ctx.telegram.editMessageText( chatId, messageId, null, message , customExtra);
+    if ( !activeResourses ) {
+      setTimeout(() => {
+        ctx.deleteMessage( messageId );
+        ctx.session.postme = {};
+      }, 1000 * 15);
+    };
+    
+  } catch (error) {
+    console.error(error)
+  }
+};
+
+const selectedSource = async (ctx, listeningChatId) => {
+  try {
+    const { messageId } = ctx.session.postme;
+    const optionsForDb = {
+      listenerChatId: ctx.chat.id,
+      listeningChatId
+    };
+    const selected = await postmeMongoListener(optionsForDb, 'listening');
+    await ctx.answerCbQuery(selected, true);
+    ctx.deleteMessage( messageId );
+    ctx.session.postme = {};
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+const setSource = async (ctx, options) => {   
+  try {
+    const { chatId, messageId } = ctx.session.postme;
+    const optionsForDb = {chatId: ctx.chat.id, problem: options?.problem, redis: ctx.redis, userbotExist: false};
+
+    try {
+      const userborov = await ctx.telegram.getChatMember(chatId, process.env.SHEN_VISOR);
+      if ( options?.problem !== 'private' && (userborov.status === "left" || userborov.status === "kicked") ) {
+        throw new Error('user not found');
+      };
+      optionsForDb.problem = null;
+      optionsForDb.userbotExist = true;;
+    } catch (error) {
+      if (options?.problem !== 'private') {
+        optionsForDb.problem = 'chatType';
+      }
+    }
+
+    const message = await postmeMongoListener( optionsForDb, 'adding' );
+    await ctx.telegram.editMessageText(chatId, messageId, null, message );
+    
+    ctx.session.postme = {};
+    setTimeout(() => {
+      ctx.deleteMessage(messageId);
+    }, 1000 * 30);
+  } catch (error) {
+    console.error( error )
+  }
+};
+
+const typeSource = async (ctx, msgType) => {
+  try {
+    const { chatId, messageId } = ctx.session.postme;
+    const optionsForDb = {
+      chatId: ctx.chat.id,
+      msgType
+    };
+      const contentTypes = await postmeMongoListener(optionsForDb, 'setMediatypes');
+
+
+      const cbButtons = [
+        [
+          { text: `🖼 Фото ${checkBox(contentTypes.photo)}`, callback_data: 'typeSource:photo', hide: false },
+          { text: `🎥 Видео/GIF ${checkBox(contentTypes.video)}`, callback_data: 'typeSource:video', hide: false },
+          { text: `🔗 Ссылки ${checkBox(contentTypes.links)}`, callback_data: 'typeSource:links', hide: false }
+        ],
+        [
+          { text: `♾ Любой ${checkBox(contentTypes.all)}`, callback_data: 'typeSource:all', hide: false },
+          { text: `🎵 Аудио ${checkBox(contentTypes.audio)}`, callback_data: 'typeSource:audio', hide: false }
+        ],
+        [{ text: `🔰 Выход 🔰`, callback_data: 'deleteThisMsg', hide: false }]
+      ];
+      const customExtra = { reply_markup: {inline_keyboard: cbButtons}, parse_mode: 'HTML'};
+      const message = 'Выберите какой контент вы готовы получать';
+
+      ctx.telegram.editMessageText( chatId, messageId, null, message , customExtra);
+  } catch (error) {
+    console.error( error );
+  }
+  
+};
+
+const delSource = async (ctx) => {
+  try {
+    const { chatId, messageId } = ctx.session.postme;
+    const optionsForDb = {
+      chatId
+    };
+
+    const deleteRequest = await postmeMongoListener( optionsForDb, 'delete');
+
+    const message = deleteRequest ? `Чат успешно удален` : 'Чата в источниках нет!';
+
+    ctx.answerCbQuery( message, true )
+    ctx.session.postme = {};
+    ctx.deleteMessage(messageId);
+  } catch (error) {
+    console.error( error )
+  }
+};
+
+const getPost = async (ctx, params) => {
+  try {
+    const { chatId, messageId, mediaTypes } = ctx.session.postme;
+    const optionsForDb = {
+      chatId,
+      mediaTypes,
+      params,
+      redis: ctx.redis
+    };
+
+    const postRequest = await postmeMongoListener(optionsForDb, 'getPost');
+
+    if (postRequest && typeof postRequest !== "string") {
+      ctx.deleteMessage(messageId);
+      ctx.session.postme = {};
+      return undefined;
+    }
+    const message = postRequest ? postRequest : 'Контент не найден, попробуйте позже'
+
+    ctx.deleteMessage(messageId)
+    const newMessage = await ctx.telegram.sendMessage(chatId, message, Extra.HTML())
+    ctx.session.postme = {};
+    setTimeout(() => {
+      ctx.deleteMessage(newMessage.message_id);
+    }, 1000 * 30);
+      
+  } catch (error) {
+    console.error(error)
+  }
+}       
 
 module.exports = {
     replys,
@@ -474,4 +226,27 @@ module.exports = {
     delSource,
     typeSource,
     getPost,
+}
+
+function correctMessageId(ctx) {
+  const messageId = ctx.callbackQuery ? ctx.callbackQuery.message.message_id :
+    !ctx.message ? ctx.channelPost.message_id : ctx.message.message_id;
+  return messageId;
+};
+
+function genListResources(arr) {
+  const cbBtns = arr.map( resource => {
+      const resourseType =
+        resource.chatType === 'channel' ? '📣'
+        : resource.chatType === 'group' ? '🗣'
+        : resource.chatType === 'supergroup' ? '🗣'
+        : resource.chatType === 'private' ? '👩🏻‍💻'
+        : ' ';
+      return [{ text: `${resourseType} ${resource.title || resource.username}`, callback_data: `selectedSource:${resource.chatID}`, hide: false}]
+  });
+  return cbBtns;
+};
+
+function checkBox(bool) {
+    return bool === true ? '✅' : '⬜️';
 }

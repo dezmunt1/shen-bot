@@ -1,24 +1,29 @@
 const moment = require('moment-timezone');
 
 function correctTime(date, gmt) {
-    // 22.11.1991 в 22.00
-    let abc = date.split('в')
-                .map(elem => {
-                    return elem.split('.')
-                });
-    abc = abc[0].concat(abc[1]);
+  // 22.11.1991 в 22.00
+  const transformDate = date
+    .split('в')
+    .map( (elem, i) => {
+      const spl = elem.split('.');
+      if (  i === 0  && spl.length === 3 ) {
+        return { day: +spl[0], month: +spl[1], year: +spl[2] };
+      };
+      return { hours: +spl[0], minutes: +spl[1] }
+    });
 
-    let presentTime = new Date(); // UTC
-    let futureTime = new Date(abc[2], +abc[1]-1, abc[0], abc[3], abc[4]) - (gmt * 3600000);
-    futureTime = new Date(futureTime);
-    console.log(`futureTime: ${futureTime}; presentTime:${presentTime}`);
-    if (futureTime < presentTime) {
-        return false
-    } else {
-        return futureTime;
-    }
+  const { day, month, year, hours, minutes } = { ...transformDate[0], ...transformDate[1] };
+
+  const presentTime = new Date(); //
+  const gmtNumber = process.env.NODE_ENV === 'production' ? (gmt * 3600000) : 0;
+  let futureTime = new Date( year, month-1, day, hours, minutes) - gmtNumber;
+  if (futureTime < presentTime) {
+      return false
+  } else {
+      return futureTime;
+  }
 }
-
+// 
 const formatDate = (date) => {
     const editedDate = {
         year: date.getFullYear(),

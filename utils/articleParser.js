@@ -24,7 +24,7 @@ const kodParser = () => {
     return new Promise((res, rej)=>{
         Osmosis
         .get(URL)
-        .find('.post-card .box')
+        .find('.post-card__title')
         .set({
             articles: '@href'
         })

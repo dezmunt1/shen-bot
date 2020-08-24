@@ -1,46 +1,43 @@
-
-const fs = require('fs');
 const Extra = require('telegraf/extra');
-const {articleMongoListener} = require('../utils/mongoDB/mongoListener');
-const articleParser = require('../utils/articleParser')
+const {articleMongoListener, updateArticleResourses} = require('../utils/mongoDB/mongoListener');
+const articleParser = require('../utils/articleParser');
 
 function random(arr) {
-    return arr[Math.floor(Math.random() * (arr.length - 0)) + 0];
+  return arr[Math.floor(Math.random() * (arr.length - 0)) + 0];
 }
 
-module.exports = ctx => {
-    const articlResource = ctx.match[ctx.match.length-1].toLowerCase();
-    if(articlResource === 'хакер') { // здесь надо получить массив и вырвать из него рандомную статью. Есть необходимость чтобы статьи мньше повторялись
-        const getArt = articleMongoListener(articlResource, articleParser.xakepParser);
-        getArt.then( result => {
-                ctx.reply(random(result).link);
-            });
-        return;
+// Refresh article resourses
+setInterval( () => {
+  updateArticleResourses();
+}, 1000 * 60 * 60 * random( [1, 2, 3] ))
+
+module.exports = async (ctx) => {
+  try {
+
+    const articleResource = ctx.match[ctx.match.length-1].toLowerCase();
+
+    if ( articleResource === 'хакер' ) { // здесь надо получить массив и вырвать из него рандомную статью. Есть необходимость чтобы статьи мньше повторялись
+      const articlesArr = await articleMongoListener(articleResource, articleParser.xakepParser);
+      return ctx.reply(random(articlesArr).link);
     }
 
-    if(articlResource === 'код дурова' || articlResource === 'код'){
-        const getArt = articleMongoListener(articlResource, articleParser.kodParser)
-            getArt.then( result => {
-                ctx.reply(random(result));
-            })
-            .catch(err => {
-                ctx.reply(`Увы, по запросу <b>"${articlResource}"</b> не доступны сервера. \nОтвет сервера: ${err}`, Extra.HTML(true));
-            });    
-        return;
+    if ( articleResource === 'код дурова' || articleResource === 'код' ) {
+      const articlesArr = await articleMongoListener(articleResource, articleParser.kodParser);
+      return ctx.reply(random(articlesArr));
     }
 
-    if(articlResource === 'comss' || articlResource === 'комсс'){
-        const getArt = articleMongoListener(articlResource, articleParser.comssParser)
-            getArt.then( result => {
-                ctx.reply(random(result).link);
-            });    
-        return;
+    if(articleResource === 'comss' || articleResource === 'комсс'){
+      const articlesArr = await articleMongoListener(articleResource, articleParser.comssParser);
+      return ctx.reply(random(articlesArr).link)
     }
 
-    if(articlResource === 'list' || articlResource === 'список'){
-        ctx.reply(`<b>Список доступных ресурсов:</b>\n1. "код" или "код дурова".\n2. "хакер".\n3. "комсс" или "comss".`, Extra.HTML(true));
-        return;
+    if(articleResource === 'list' || articleResource === 'список'){
+      return ctx.reply(`<b>Список доступных ресурсов:</b>\n1. "код" или "код дурова".\n2. "хакер".\n3. "комсс" или "comss".`, Extra.HTML(true));
     }
 
-    ctx.reply(`Нет статей по запросу <b>"${articlResource}"</b>`, Extra.HTML(true));
+    ctx.reply(`Нет статей по запросу <b>"${articleResource}"</b>`, Extra.HTML(true));
+    
+  } catch (error) {
+    console.error(error.message);
+  }
 };

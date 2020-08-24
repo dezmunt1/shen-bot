@@ -10,7 +10,7 @@ module.exports = (ctx) => {
     if (Array.isArray(checkRegex)) {
         userMongoListener(ctx)
             .then( thisUser => {
-                thisUser.gmt = inputedTmz;
+                thisUser.gmt = +inputedTmz;
                 thisUser.save((err, savedUser)=>{
                     if (err) console.error(err);
                     ctx.reply(message, {parse_mode: 'HTML'});

@@ -2,6 +2,7 @@ const Router = require('telegraf/router');
 const {respectMongoListener, postmeMongoListener} = require('./utils/mongoDB/mongoListener');
 const {setSource, delSource, selectSource, selectedSource, replys, typeSource, getPost} = require('./handlers/postme');
 const {sendFutureScene, enteringText} = require('./handlers/delorian');
+const { error } = require('osmosis');
 
 
 
@@ -23,6 +24,8 @@ const callbackQuerys = new Router((ctx) => {
 });
 ;
 
+// DELORIAN
+
 callbackQuerys.on('sendFuture', (ctx) => {
     try {
         ctx.scene.enter('sendFuture');
@@ -39,6 +42,8 @@ callbackQuerys.on('exitScene', (ctx) => {
     console.log('Выход из сцены');
 });
 
+// RESPEKT
+
 callbackQuerys.on('like', (ctx) => {
     respectMongoListener(ctx);
     ctx.answerCbQuery('Заебись', false);
@@ -49,13 +54,16 @@ callbackQuerys.on('dislike', (ctx) => {
     ctx.answerCbQuery('Говно', false);
 });
 
+// POSTME
+
 callbackQuerys.on('selectSource', (ctx) => {
     try {
-        selectSource(ctx);
-    } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
+        return selectSource(ctx);
+    } catch(e) { 
         ctx.answerCbQuery('Этот опрос не актуален', false);
     };
 });
+
 callbackQuerys.on('selectedSource', (ctx) => {
     try {
         const resource = ctx.state.cbParams;
@@ -64,18 +72,21 @@ callbackQuerys.on('selectedSource', (ctx) => {
         ctx.answerCbQuery('Этот опрос не актуален', false);
     };
 });
-callbackQuerys.on('setSource', (ctx) => {
+
+callbackQuerys.on('setSource', async (ctx) => {
     try {
-        if (ctx.chat.type !== 'private') {
-            setSource(ctx);
-            return
+        if (ctx.chat.type !== 'private' && ctx.chat.username) { // публичная группа
+            return setSource(ctx);
         };
-        ctx.reply('У вас приватная группа, добавьте к себе в группу @shen_visor');
-        
-    } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
-        ctx.answerCbQuery('Этот опрос не актуален', false);
+        if (ctx.chat.type !== 'private' && !ctx.chat.username) { // частная группа
+            return setSource(ctx, {problem: 'chatType'});
+        };
+        return setSource(ctx, {problem: 'private'});
+    } catch(error) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
+        console.error( error );
     };
 });
+
 callbackQuerys.on('getSource', (ctx) => {
     try {
         const resource = ctx.state.cbParams;
@@ -87,11 +98,7 @@ callbackQuerys.on('getSource', (ctx) => {
 callbackQuerys.on('typeSource', (ctx) => {
     try {
         const msgType = ctx.state.cbParams;
-        postmeMongoListener(ctx, {getMsgTypes: msgType})
-            .then ( type => {
-                typeSource(ctx, type);
-                return;
-            })
+        typeSource(ctx, msgType);
     } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
         ctx.answerCbQuery('Этот опрос не актуален', false);
     };
@@ -103,6 +110,9 @@ callbackQuerys.on('delSource', (ctx) => {
         ctx.answerCbQuery('Этот опрос не актуален', false);
     };
 });
+callbackQuerys.on('replyMore', (ctx) => {
+    return replys(ctx, 'contentMore');
+})
 callbackQuerys.on('deleteThisMsg', (ctx) => {
     try {
         ctx.deleteMessage(ctx.callbackQuery.message.message_id);
