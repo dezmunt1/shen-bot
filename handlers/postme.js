@@ -108,18 +108,19 @@ const selectedSource = async (ctx, listeningChatId) => {
 
 const setSource = async (ctx, options) => {   
   try {
+    const problem = options.problem ? options.problem : null
     const { chatId, messageId } = ctx.session.postme;
-    const optionsForDb = {chatId: ctx.chat.id, problem: options?.problem, redis: ctx.redis, userbotExist: false};
+    const optionsForDb = {chatId: ctx.chat.id, problem: problem, redis: ctx.redis, userbotExist: false};
 
     try {
       const userborov = await ctx.telegram.getChatMember(chatId, process.env.SHEN_VISOR);
-      if ( options?.problem !== 'private' && (userborov.status === "left" || userborov.status === "kicked") ) {
+      if ( problem !== 'private' && (userborov.status === "left" || userborov.status === "kicked") ) {
         throw new Error('user not found');
       };
       optionsForDb.problem = null;
       optionsForDb.userbotExist = true;;
     } catch (error) {
-      if (options?.problem !== 'private') {
+      if (problem !== 'private') {
         optionsForDb.problem = 'chatType';
       }
     }
