@@ -274,6 +274,8 @@ const postmeMongoListener = async function( options, type) {
       if (getListenerChat.postme.listening === 0) {
         return 'Сначала веберите источник. <b>Введите</b> <code>/postme options</code>';
       };
+
+      const listeningChatId = getListenerChat.postme.listening
       
       const getPost = async () => {
         const mediaType = randomType === 'all' ? [allMediaTypes.pop()] : 
@@ -302,7 +304,15 @@ const postmeMongoListener = async function( options, type) {
         return undefined;
       }
       const postedMessage = post[0][randomType];
-      options.redis.redisEmmiter.emit('sendPost', {action: 'sendMessage', message: postedMessage, chatId: options.chatId});
+      options.redis.redisEmmiter.emit(
+        'sendPost',
+        {
+          action: 'sendMessage',
+          message: postedMessage,
+          chatIdTarget: options.chatId,
+          chatId: listeningChatId
+        }
+      );
       return true;
 
     }
