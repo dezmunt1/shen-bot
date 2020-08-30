@@ -108,7 +108,9 @@ const selectedSource = async (ctx, listeningChatId) => {
 
 const setSource = async (ctx, options) => {   
   try {
-    const problem = options.problem ? options.problem : null
+    const problem = options && options.problem
+        ? options.problem
+        : null
     const { chatId, messageId } = ctx.session.postme;
     const optionsForDb = {chatId: ctx.chat.id, problem: problem, redis: ctx.redis, userbotExist: false};
 
