@@ -1,10 +1,10 @@
-const {correctTime, formatDate} = require('../dateTransform');
 const articleParser = require('../articleParser');
 const Markup = require('telegraf/markup');
 const {DelorianModel, RespectModel, ArticleModel, UserModel, ChatModel} = require('../../models/schemas');
 const handlerMessages = require('../handlerMessages');
 const {Types} = require('mongoose');
-const {Random} = require('random-js');
+const {Random} = require('random-js')
+const { hashPassword, checkHashPassword } = require('../utils')
 
 const random = new Random();
 
@@ -98,7 +98,15 @@ const dlMongoListener = async function(ctx, newData) {
     console.error( error )
   }
   
-};
+}
+
+const addDelorianModel = data => {
+  if ( !data ) {
+    return
+  }
+  const newEntry = new DelorianModel( data )
+  newEntry.save()
+}
 
 
 const respectMongoListener = function(ctx) {
@@ -366,10 +374,15 @@ const postmeMongoListener = async function( options, type) {
       if (chat.postme.resourseActive === true) {
         return `Чат уже в базе данных`;
       };
-      chat.postme.resourseActive = true;
+      chat.postme.resourseActive = true
+      chat.postme.password = await hashPassword(options.password)
       await chat.save();
 
-      options.redis.redisEmmiter.emit('adding', {action: 'scrapChat', chatId: chat.chatID, maxMsgId: chat.maxMsgId, userbotExist: options.userbotExist});
+      options.redis.redisEmmiter.emit('adding', {
+        action: 'scrapChat',
+        chatId: chat.chatID,
+        userbotExist: options.userbotExist
+      })
       
       return('Чат добавлен в базу данных');
     };
@@ -459,44 +472,11 @@ function returnMsgId(ctx) {
   const msgChannel = ctx.message ? ctx.message.message_id : false;
   const msgGroup = ctx.channelPost ? ctx.channelPost.message_id : false;
   return msgGroup || msgChannel
-};
-
-function addNewContent(ctx, db) { /* content, messageId, allContent */
-  if (ctx.callbackQuery) return; // С нажатых кнопок обнволения собирать не будем
-  const message = ctx.channelPost ? ctx.channelPost : ctx.message;
-  if (message.photo) {
-    handlerMessages.messagePhoto(message, message.message_id, db);
-    return
-  };
-  if (message.animation) {
-    handlerMessages.messageAnimation(message, message.message_id, db);
-    return
-  }
-  if (message.text) {
-    handlerMessages.messageText(message, message.message_id, db);
-    return
-  }
-  if (message.video) {
-    handlerMessages.messageVideo(message, message.message_id, db);
-    return
-  }
-  if (message.video_note) {
-    handlerMessages.messageVideoNote(message, message.message_id, db);
-    return
-  }
-  if (message.voice) {
-    handlerMessages.messageVoiceNote(message, message.message_id, db);
-    return
-  }
-  if (message.audio) {
-    handlerMessages.messageAudio(message, message.message_id, db);
-    return
-  }
-  
 }
 
 module.exports = {
   dlMongoListener,
+  addDelorianModel,
   respectMongoListener,
   articleMongoListener,
   updateArticleResourses,

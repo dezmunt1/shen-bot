@@ -1,10 +1,10 @@
-const { postmeMongoListener } = require('../utils/mongoDB/mongoListener');
-const { Extra } = require('telegraf');
+const { postmeMongoListener } = require('../utils/mongoDB/mongoListener')
+const { Extra } = require('telegraf')
 
 
 const replys = async (ctx, params) => { // main
     try {
-      const channPostTrue = ctx.channelPost ? (ctx.channelPost.text.slice(8)).toLowerCase() : false;
+      const channPostTrue = ctx.channelPost ? (ctx.channelPost.text.slice(8)).toLowerCase() : false
 
       if ( params === 'receivingСontent' ) {
         await ctx.reply('\u2060', {
@@ -12,17 +12,19 @@ const replys = async (ctx, params) => { // main
             [{ text: '🔄 ЕЩЁ', callback_data: 'replyMore', hide: false}]
           ]},
           disable_notification: true
-        });
-        return undefined;
+        })
+        return undefined
       }
+
       if ( params === 'contentMore') {
-        ctx.telegram.deleteMessage( ctx.chat.id, correctMessageId(ctx) - 1 );
+        ctx.telegram.deleteMessage( ctx.chat.id, correctMessageId(ctx) - 1 )
       }
-      ctx.telegram.deleteMessage( ctx.chat.id, correctMessageId(ctx) );
+
+      ctx.telegram.deleteMessage( ctx.chat.id, correctMessageId(ctx) )
       
-      const welcomeToPostme = await ctx.replyWithSticker( process.env.WAIT_STICK );
+      const welcomeToPostme = await ctx.replyWithSticker( process.env.WAIT_STICK )
   
-      const mediaTypes = await postmeMongoListener( {chatId: welcomeToPostme.chat.id}, 'getMediatypes' );
+      const mediaTypes = await postmeMongoListener( {chatId: welcomeToPostme.chat.id}, 'getMediatypes' )
 
       ctx.session.postme = {
         chatId: welcomeToPostme.chat.id,
@@ -31,8 +33,8 @@ const replys = async (ctx, params) => { // main
       }
     
       if ((ctx.match && ctx.match[1].toLowerCase() === 'options') || params === 'options' || channPostTrue === 'options') {
-        const { chatId, messageId } = ctx.session.postme;
-        ctx.deleteMessage(messageId);
+        const { chatId, messageId } = ctx.session.postme
+        ctx.deleteMessage(messageId)
         const sendOptions = await ctx.reply( 'Настроим репостер ⚙', {reply_markup:
             {inline_keyboard: [
                 [{ text: '📃 Откуда репостим', callback_data: 'selectSource', hide: false}],
@@ -41,12 +43,12 @@ const replys = async (ctx, params) => { // main
                 [{ text: '🗑 Удалить чат из источников', callback_data: 'delSource', hide: false }]
               ]
             }
-          });
+          })
           ctx.session.postme = {...ctx.session.postme, chatId: sendOptions.chat.id ,messageId: sendOptions.message_id};
-      };
+      }
 
       if ( ((params === 'content') || (params === 'contentMore')) && channPostTrue !== 'options' ) {
-        getPost(ctx, params);
+        getPost(ctx, params)
       }
     } catch (error) {
       console.error(error)
@@ -92,6 +94,7 @@ const selectSource = async (ctx) => {
 
 const selectedSource = async (ctx, listeningChatId) => {
   try {
+
     const { messageId } = ctx.session.postme;
     const optionsForDb = {
       listenerChatId: ctx.chat.id,
@@ -111,29 +114,32 @@ const setSource = async (ctx, options) => {
     const problem = options && options.problem
         ? options.problem
         : null
-    const { chatId, messageId } = ctx.session.postme;
-    const optionsForDb = {chatId: ctx.chat.id, problem: problem, redis: ctx.redis, userbotExist: false};
+    const { chatId, messageId } = ctx.session.postme
+
+    const sceneState = {
+      chatId: ctx.chat.id,
+      problem: problem,
+      redis: ctx.redis,
+      userbotExist: false
+    }
 
     try {
       const userborov = await ctx.telegram.getChatMember(chatId, process.env.SHEN_VISOR);
       if ( problem !== 'private' && (userborov.status === "left" || userborov.status === "kicked") ) {
-        throw new Error('user not found');
-      };
-      optionsForDb.problem = null;
-      optionsForDb.userbotExist = true;;
+        throw new Error('User not found')
+      }
+      sceneState.problem = null
+      sceneState.userbotExist = true
     } catch (error) {
       if (problem !== 'private') {
-        optionsForDb.problem = 'chatType';
+        sceneState.problem = 'chatType'
       }
     }
 
-    const message = await postmeMongoListener( optionsForDb, 'adding' );
-    await ctx.telegram.editMessageText(chatId, messageId, null, message );
-    
-    ctx.session.postme = {};
-    setTimeout(() => {
-      ctx.deleteMessage(messageId);
-    }, 1000 * 30);
+    ctx.scene.enter('chatRegister', sceneState)
+    ctx.deleteMessage(messageId)
+    ctx.session.postme = {}
+
   } catch (error) {
     console.error( error )
   }
@@ -232,10 +238,13 @@ module.exports = {
 }
 
 function correctMessageId(ctx) {
-  const messageId = ctx.callbackQuery ? ctx.callbackQuery.message.message_id :
-    !ctx.message ? ctx.channelPost.message_id : ctx.message.message_id;
-  return messageId;
-};
+  const messageId = ctx.callbackQuery
+    ? ctx.callbackQuery.message.message_id
+    : !ctx.message
+      ? ctx.channelPost.message_id
+      : ctx.message.message_id
+  return messageId
+}
 
 function genListResources(arr) {
   const cbBtns = arr.map( resource => {

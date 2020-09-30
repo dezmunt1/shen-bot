@@ -63,7 +63,9 @@ const chatSchema = new mongoose.Schema({
         },
         resourseActive: {type: Boolean, default: false},
         listening: {type: Number, default: 0},
-        listeners: {type: Array, default: []}
+        listeners: {type: Array, default: []},
+        password: {type: String, default: ''},
+        passwordRequired: {type: Boolean, default: false}
     },    
 });
 

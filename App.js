@@ -1,16 +1,17 @@
-const Telegraf = require('telegraf');
-const rateLimit = require('telegraf-ratelimit');
-const Stage = require('telegraf/stage');
-const session = require('telegraf/session');
-const redis = require('redis');
-const redisPromise = require('./utils/redisPromise');
-const RedisEmmiter = require('node-redis-pubsub');
-const MongoInit = require('./utils/mongoDB/mongoInit');
-const actions = require('./actions');
-const {dlMongoListener, addChatMongoListener, userMongoListener} = require('./utils/mongoDB/mongoListener');
-const tmzEditor = require('./utils/tmzEditor');
-const errorHandler = require('./utils/errorHandler');
-const {etiquette, weatherApp, getArticle, delorian, respect, postme} = require('./handlers');
+const Telegraf = require('telegraf')
+const rateLimit = require('telegraf-ratelimit')
+const Stage = require('telegraf/stage')
+const session = require('telegraf/session')
+const redis = require('redis')
+const redisPromise = require('./utils/redisPromise')
+const RedisEmmiter = require('node-redis-pubsub')
+const MongoInit = require('./utils/mongoDB/mongoInit')
+const { callbackQuerys } = require('./actions')
+const {dlMongoListener, addChatMongoListener, userMongoListener} = require('./utils/mongoDB/mongoListener')
+const tmzEditor = require('./utils/tmzEditor')
+const errorHandler = require('./utils/errorHandler')
+const {etiquette, weatherApp, getArticle, delorian, respect, postme} = require('./handlers')
+const scenes = require('./handlers/scenes')
 
 const redisEmmiter = new RedisEmmiter({
   port: 6379,
@@ -62,8 +63,8 @@ bot.use(stage.middleware());
 
 bot.context.redis = {...redisPromise( redisClient ), redisEmmiter};
 
-actions.sendToRegister.forEach(scene => { //регистрируем сцены из actions.js
-  stage.register(scene);
+scenes.forEach( scene => { //регистрируем сцены 
+  stage.register(scene)
 })
 
 bot.on( 'message', (ctx, next) => {
@@ -146,7 +147,7 @@ bot.command('start', ctx => {
 
 
 
-bot.on('callback_query', actions.callbackQuerys);
+bot.on('callback_query', callbackQuerys)
 
 
 bot.catch((err) => {
