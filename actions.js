@@ -32,9 +32,11 @@ callbackQuerys.on('sendFuture', (ctx) => {
 callbackQuerys.on('exitScene', (ctx) => {
     ctx.deleteMessage(ctx.callbackQuery.message.message_id)
     ctx.answerCbQuery('Ну и не надо', false)
-    ctx.scene.leave()
-    console.log('Выход из сцены')
-});
+    if (ctx.scene.current) {
+        ctx.scene.leave()
+        console.log('Выход из сцены')
+    }
+})
 
 // RESPEKT
 
@@ -61,7 +63,7 @@ callbackQuerys.on('selectSource', (ctx) => {
 callbackQuerys.on('selectedSource', (ctx) => {
     try {
         const resource = ctx.state.cbParams
-        ctx.scene.enter()
+        selectedSource(ctx, resource)
     } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
         ctx.answerCbQuery('Этот опрос не актуален', false);
     };
@@ -120,10 +122,9 @@ callbackQuerys.on('deleteThisMsg', (ctx) => {
 
 callbackQuerys.on('postmeSetPassword', ctx => {
     const setPassword = ctx.state.cbParams
-    if ( setPassword ) {
-        // Доделываю логику с если пароля нет
-    }
-    
+    const newState = Object.assign( ctx.scene.state, { setPassword } )
+    ctx.scene.leave()
+    ctx.scene.enter( 'chatRegister', newState )
 })
 
 

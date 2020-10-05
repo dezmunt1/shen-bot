@@ -4,7 +4,13 @@ const timerExit = function() {
     timerId = setTimeout( () => {
       ctx.scene.leave()
       console.log('Выхожу из сцены')
-      ctx.telegram.editMessageText(ctx.callbackQuery.message.chat.id, ctx.callbackQuery.message.message_id, null, exitMessage)
+      ctx.reply(exitMessage, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: 'Выход', callback_data: 'exitScene', hide: false}]
+          ]
+        }
+      })
     }, 1000 * 60 * 3, ctx)
   }
   const stop = () => {

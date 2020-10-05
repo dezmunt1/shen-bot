@@ -347,6 +347,30 @@ const postmeMongoListener = async function( options, type) {
       return 'Ресурс успешно выбран!'
     }
 
+    if ( type === 'protected' ) {
+      try {
+        const listenerChat = await ChatModel.findOne(
+          { chatID: options.listeningChatId },
+          { "postme.passwordRequired": 1 }
+        )
+        const isProtected = listenerChat
+            ? { isProtected: listenerChat.postme.passwordRequired }
+            : false
+        return isProtected
+      } catch (error) {
+        console.error(error)
+      }
+    }
+
+    if ( type === 'getHash' ) {
+      const listenerChat = await ChatModel.findOne(
+        { chatID: options.listeningChatId },
+        { "postme.password": 1 }
+      )
+      const password = listenerChat ? { password: listenerChat.postme.password } : false
+      return password
+    }
+
     if ( type === 'selectSource') {
       const getActiveResourses = await ChatModel.find({"postme.resourseActive": true}); 
       if ( !getActiveResourses.length ) {
@@ -372,10 +396,17 @@ const postmeMongoListener = async function( options, type) {
       }
 
       if (chat.postme.resourseActive === true) {
-        return `Чат уже в базе данных`;
-      };
+        return 'Чат уже в базе данных'
+      }
+
       chat.postme.resourseActive = true
-      chat.postme.password = await hashPassword(options.password)
+      chat.postme.passwordRequired = false
+
+      if (options.setPassword) {
+        chat.postme.passwordRequired = true
+        chat.postme.password = await hashPassword(options.password)
+      }
+      
       await chat.save();
 
       options.redis.redisEmmiter.emit('adding', {
@@ -384,8 +415,8 @@ const postmeMongoListener = async function( options, type) {
         userbotExist: options.userbotExist
       })
       
-      return('Чат добавлен в базу данных');
-    };
+      return 'Чат добавлен в базу данных'
+    }
 
     if ( type === 'delete' ) {
       await ChatModel.updateMany(
@@ -400,7 +431,10 @@ const postmeMongoListener = async function( options, type) {
           {
             $set: {
               'postme.listeners': [],
-              'postme.resourseActive': false
+              'postme.resourseActive': false,
+              'postme.passwordRequired': false,
+              'postme.password': ''
+
             }
           }, 
           {

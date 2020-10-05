@@ -1,4 +1,4 @@
-const { postmeMongoListener } = require('../utils/mongoDB/mongoListener')
+const { postmeMongoListener, default: mongoListener } = require('../utils/mongoDB/mongoListener')
 const { Extra } = require('telegraf')
 
 
@@ -40,7 +40,8 @@ const replys = async (ctx, params) => { // main
                 [{ text: '📃 Откуда репостим', callback_data: 'selectSource', hide: false}],
                 [{ text: '📌 Выбрать чат как источник', callback_data: 'setSource', hide: false}],
                 [{ text: '✔️ Выбрать тип контента', callback_data: 'typeSource:current', hide: false }],
-                [{ text: '🗑 Удалить чат из источников', callback_data: 'delSource', hide: false }]
+                [{ text: '🗑 Удалить чат из источников', callback_data: 'delSource', hide: false }],
+                [{ text: '👋 Выход 👋 ', callback_data: 'exitScene', hide: false }],
               ]
             }
           })
@@ -94,18 +95,20 @@ const selectSource = async (ctx) => {
 
 const selectedSource = async (ctx, listeningChatId) => {
   try {
-
     const { messageId } = ctx.session.postme;
     const optionsForDb = {
+      messageId,
       listenerChatId: ctx.chat.id,
       listeningChatId
-    };
-    const selected = await postmeMongoListener(optionsForDb, 'listening');
-    await ctx.answerCbQuery(selected, true);
-    ctx.deleteMessage( messageId );
-    ctx.session.postme = {};
+    }
+    const isProtected = await postmeMongoListener( { listeningChatId }, 'protected')
+    if (isProtected) {
+      Object.assign(optionsForDb, isProtected)
+    }
+    ctx.scene.enter( 'postmeAuth', optionsForDb )
+    ctx.session.postme = {}
   } catch (error) {
-    console.error(error);
+    console.error(error)
   }
 }
 
@@ -136,7 +139,7 @@ const setSource = async (ctx, options) => {
       }
     }
 
-    ctx.scene.enter('chatRegister', sceneState)
+    ctx.scene.enter('setPassword', sceneState)
     ctx.deleteMessage(messageId)
     ctx.session.postme = {}
 

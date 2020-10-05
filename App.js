@@ -81,14 +81,14 @@ bot.use((ctx, next) => {
         .then( msg => console.log(msg));
     });
   userMongoListener(ctx)
-  .then( thisUser => {
-    if (typeof(thisUser) === 'string') {
-      console.log(thisUser);
-    }
-  })
-  .catch( err => {
-    console.log(err)
-  });
+    .then( thisUser => {
+      if (typeof(thisUser) === 'string') {
+        console.log(thisUser);
+      }
+    })
+    .catch( err => {
+      console.log(err)
+    });
   const start = new Date();  
   return next(ctx).then(() => {
     const ms = new Date() - start;
