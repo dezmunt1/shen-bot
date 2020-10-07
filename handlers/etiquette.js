@@ -1,4 +1,4 @@
-module.exports = (ctx) => {
+module.exports = async (ctx) => {
     
   // New user in chat
   if (ctx.message.new_chat_member) {

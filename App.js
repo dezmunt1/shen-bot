@@ -1,3 +1,4 @@
+require('dotenv').config()
 const Telegraf = require('telegraf')
 const rateLimit = require('telegraf-ratelimit')
 const Stage = require('telegraf/stage')
@@ -16,7 +17,7 @@ const scenes = require('./handlers/scenes')
 const redisEmmiter = new RedisEmmiter({
   port: 6379,
   scope: 'demo'  
-});
+})
 
 const redisClient = redis.createClient()
   .on('connect', () => {
@@ -26,19 +27,16 @@ const redisClient = redis.createClient()
     throw err
   })
 
-require('dotenv').config();
-
-
 const db = new MongoInit({
   path: process.env.MONGODB_URI,
   auth: {
     name: process.env.MONGODB_USER,
     pwd: process.env.MONGODB_PWD
   }
-});
+})
 
-const bot = new Telegraf(process.env.TELETOKEN_DEV, {channelMode: true} );
-const stage = new Stage();
+const bot = new Telegraf(process.env.TELETOKEN_DEV, {channelMode: true} )
+const stage = new Stage()
 
 const limitConfig = {
   window: 1000,
@@ -46,86 +44,80 @@ const limitConfig = {
   onLimitExceeded: (ctx) => {
     if (ctx.callbackQuery) {
       ctx.answerCbQuery('Не надо так часто жать на кнопочку');
-      return;
+      return
     }
   }
 };
-bot.use(rateLimit(limitConfig));
+bot.use(rateLimit(limitConfig))
 bot.use(session({
   getSessionKey: (ctx) => {
     if (ctx.chat.type === 'channel') {
       return `${ctx.chat.id}` 
     }
-    return ctx.from && ctx.chat && `${ctx.from.id}:${ctx.chat.id}`;
+    return ctx.from && ctx.chat && `${ctx.from.id}:${ctx.chat.id}`
   }
-}));
-bot.use(stage.middleware());
+}))
 
-bot.context.redis = {...redisPromise( redisClient ), redisEmmiter};
+bot.use(stage.middleware())
+
+bot.context.redis = {...redisPromise( redisClient ), redisEmmiter}
 
 scenes.forEach( scene => { //регистрируем сцены 
   stage.register(scene)
 })
 
-bot.on( 'message', (ctx, next) => {
+bot.on( 'message', async (ctx, next) => {
   if (ctx.from.id === +process.env.SHEN_VISOR) {
     postme.replys(ctx, 'receivingСontent');
   }
   return next(ctx)
 })
 
-bot.use((ctx, next) => {
-  ctx.getChat(ctx.chat.id)
-    .then( thisChat => {
-      addChatMongoListener(thisChat, ctx)
-        .then( msg => console.log(msg));
-    });
-  userMongoListener(ctx)
-    .then( thisUser => {
-      if (typeof(thisUser) === 'string') {
-        console.log(thisUser);
-      }
+bot.use(async (ctx, next) => {
+  try {
+    const thisChat = await ctx.getChat(ctx.chat.id)
+    const messageChatInfo = await addChatMongoListener(thisChat, ctx)
+    console.log(messageChatInfo)
+
+    const messageUserInfo = userMongoListener(ctx)
+    if (typeof(messageUserInfo) === 'string') {
+      console.log(messageUserInfo)
+    }
+
+    const start = new Date()
+    return next(ctx).then(() => {
+      const ms = new Date() - start
+      console.log('Response time %sms', ms)
     })
-    .catch( err => {
-      console.log(err)
-    });
-  const start = new Date();  
-  return next(ctx).then(() => {
-    const ms = new Date() - start;
-    console.log('Response time %sms', ms);
+  } catch (error) {
+    console.error(error)
+  }
+})
 
-  });
+bot.on('left_chat_member', etiquette)
+bot.on('new_chat_members', etiquette)
+
+bot.hears(/^(с|С)татья (.+)/, getArticle)
+bot.hears(/^(п|П)огода [а-яА-Яa-zA-Z-]+/, weatherApp )
+
+bot.command('delorian', async (ctx) => {
+  delorian.replys(ctx)
 });
 
-bot.on('left_chat_member', etiquette);
-bot.on('new_chat_members', etiquette);
+bot.hears(/\/postme (.+)/, async (ctx) => {
+  postme.replys(ctx)
+})
+bot.command('postme', async (ctx) => {
+  postme.replys(ctx, 'content')
+})
 
-bot.hears(/^(с|С)татья (.+)/, getArticle);
-bot.hears(/^(п|П)огода [а-яА-Яa-zA-Z-]+/, weatherApp );
-
-bot.command('delorian', ctx => {
-  delorian.replys(ctx);
-});
-
-bot.hears(/\/postme (.+)/, (ctx) => {
-  postme.replys(ctx);
-
-});
-bot.command('postme', (ctx) => {
-  postme.replys(ctx, 'content');
-});
-
-bot.hears(/\/respect (.+)/, (ctx) => {
-  respect(ctx, bot);
-});
-bot.hears(/\/tmz\s(.+)/, (ctx) => {
-  tmzEditor(ctx);
-});
+bot.hears(/\/respect (.+)/, respect)
+bot.hears(/\/tmz\s(.+)/, tmzEditor)
 bot.hears(/^@error/, (ctx) => {
-  let message = (ctx.message.text).split('=')[1];
-  message = JSON.parse(message);
-  errorHandler(message, ctx);
-});
+  let message = (ctx.message.text).split('=')[1]
+  message = JSON.parse(message)
+  errorHandler(message, ctx)
+})
 
 bot.command('help', ctx => {
   ctx.reply(`
@@ -139,20 +131,14 @@ bot.command('help', ctx => {
   4. <code>/postme</code> - рандомный контент из доступного списка групп и каналов, в меню настроек можешь добавить свою группу\\канал как источник, тем самым делясь контентом с другими. Для настройки пиши "<code>/postme options</code>". Если у вас приватная группа, то добавьте в нее ${process.env.NAME_SHEN_VISOR}, он поможет боту отработать корректно!\n
   По всем вопросам и предложениям к @dezamat .\n
   5. <code>Погода</code> <i>город</i> - узнать погоду в своем городе.
-  `, Telegraf.Extra.HTML(true));
-})
-bot.command('start', ctx => {
-  dlMongoListener(ctx);
+  `, Telegraf.Extra.HTML(true))
 })
 
-
-
+bot.command('start', dlMongoListener)
 bot.on('callback_query', callbackQuerys)
-
 
 bot.catch((err) => {
   console.log('Ooops', err);
-});
+})
 
-bot.launch();
-
+bot.launch()

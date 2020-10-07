@@ -1,7 +1,7 @@
 const Markup = require('telegraf/markup');
 const {RespectModel} = require('../models/schemas');
 
-module.exports = (ctx, bot) => {
+module.exports = async (ctx) => {
     ctx.telegram.sendMessage(ctx.chat.id, ctx.match[1], Markup.inlineKeyboard([
         Markup.callbackButton(`👍 0`, 'like'),
         Markup.callbackButton(`👎 0`, 'dislike')
