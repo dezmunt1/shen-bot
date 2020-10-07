@@ -372,7 +372,22 @@ const postmeMongoListener = async function( options, type) {
     }
 
     if ( type === 'selectSource') {
-      const getActiveResourses = await ChatModel.find({"postme.resourseActive": true}); 
+      const { page, limit } = options
+      const getActiveResourses = await ChatModel
+          .find(
+            {"postme.resourseActive": true},
+            {
+              "chatType": 1,
+              "title": 1,
+              "username": 1,
+              "chatID": 1,
+              "postme.passwordRequired": 1,
+            }
+          )
+          .sort({$natural:-1})
+          .skip( page * limit )
+          .limit( limit + 1 ) // +1 to track the end of data
+
       if ( !getActiveResourses.length ) {
         return(false);
       };
@@ -484,13 +499,7 @@ const addChatMongoListener = function(chat, ctx) {
         res.private = privateOrNot;
         if (returnMsgId(ctx)) {
           res.maxMsgId = returnMsgId(ctx);
-        };
-        // try {
-        // 	addNewContent(ctx, res.postme.content);
-        // } catch (e) {
-        // 	console.log(err)
-        // }
-        // res.markModified('postme.content');
+        }
         res.save((err, futureMessage)=>{
           if (err) console.error(err);
           resolve(`${chat.type} ${chat.title || chat.username} успешно обновлен`);

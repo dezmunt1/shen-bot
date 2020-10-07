@@ -54,7 +54,8 @@ callbackQuerys.on('dislike', (ctx) => {
 
 callbackQuerys.on('selectSource', (ctx) => {
     try {
-        return selectSource(ctx);
+        const page = ctx.state.cbParams
+        return selectSource( ctx, { page: +page } )
     } catch(e) { 
         ctx.answerCbQuery('Этот опрос не актуален', false);
     };
@@ -103,7 +104,7 @@ callbackQuerys.on('typeSource', (ctx) => {
 callbackQuerys.on('delSource', (ctx) => {
     try {
         delSource(ctx);
-    } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
+    } catch(e) {
         ctx.answerCbQuery('Этот опрос не актуален', false);
     };
 })
@@ -113,11 +114,11 @@ callbackQuerys.on('replyMore', (ctx) => {
 })
 
 callbackQuerys.on('deleteThisMsg', (ctx) => {
-    try {
-        ctx.deleteMessage(ctx.callbackQuery.message.message_id);
-    } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
-        ctx.answerCbQuery('Этот опрос не актуален', false);
-    };
+  try {
+    ctx.deleteMessage(ctx.callbackQuery.message.message_id)
+  } catch(e) {
+    ctx.answerCbQuery('Этот опрос не актуален', false);
+  }
 })
 
 callbackQuerys.on('postmeSetPassword', ctx => {
@@ -125,6 +126,10 @@ callbackQuerys.on('postmeSetPassword', ctx => {
     const newState = Object.assign( ctx.scene.state, { setPassword } )
     ctx.scene.leave()
     ctx.scene.enter( 'chatRegister', newState )
+})
+
+callbackQuerys.on('plug', ctx => {
+  ctx.answerCbQuery(null, false)
 })
 
 

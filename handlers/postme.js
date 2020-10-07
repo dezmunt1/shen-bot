@@ -37,7 +37,7 @@ const replys = async (ctx, params) => { // main
         ctx.deleteMessage(messageId)
         const sendOptions = await ctx.reply( 'Настроим репостер ⚙', {reply_markup:
             {inline_keyboard: [
-                [{ text: '📃 Откуда репостим', callback_data: 'selectSource', hide: false}],
+                [{ text: '📃 Откуда репостим', callback_data: 'selectSource:0', hide: false}],
                 [{ text: '📌 Выбрать чат как источник', callback_data: 'setSource', hide: false}],
                 [{ text: '✔️ Выбрать тип контента', callback_data: 'typeSource:current', hide: false }],
                 [{ text: '🗑 Удалить чат из источников', callback_data: 'delSource', hide: false }],
@@ -56,18 +56,29 @@ const replys = async (ctx, params) => { // main
     }
 };
 
-const selectSource = async (ctx) => {
+const selectSource = async (ctx, options) => {
   try {
-    const { chatId, messageId } = ctx.session.postme;
-    const activeResourses = await postmeMongoListener(null, 'selectSource');
-    const customExtra = {};
-    let message = '';
-    if ( !activeResourses ) {
-      message = '🤖Список ресурсов пуст!';
-      customExtra.parse_mode = 'HTML';
-    } else {
-      const cbButtons = genListResources(activeResourses);
-      message = '<b>Выберите один из доступных ресурсов:</b>';
+    const { chatId, messageId } = ctx.session.postme
+    const page = options.page
+    const activeResourses = await postmeMongoListener({
+      page,
+      limit: 5
+    }, 'selectSource')
+
+    const customExtra = {}
+    let message = ''
+    if ( !activeResourses && page === 0 ) {
+      message = '🤖Список ресурсов пуст!'
+      customExtra.parse_mode = 'HTML'
+      setTimeout(() => {
+        ctx.deleteMessage( messageId )
+        ctx.session.postme = {}
+      }, 1000 * 15)
+
+    } else { 
+      const cbButtons = genListResources(activeResourses, page)
+
+      message = '<b>Выберите один из доступных ресурсов:</b>'
       Object.defineProperties( customExtra, {
         'reply_markup': {
           value: { 'inline_keyboard': cbButtons },
@@ -78,15 +89,9 @@ const selectSource = async (ctx) => {
           enumerable: true
         }
       })
-    };
+    }
 
-    await ctx.telegram.editMessageText( chatId, messageId, null, message , customExtra);
-    if ( !activeResourses ) {
-      setTimeout(() => {
-        ctx.deleteMessage( messageId );
-        ctx.session.postme = {};
-      }, 1000 * 15);
-    };
+    await ctx.telegram.editMessageText( chatId, messageId, null, message , customExtra)
     
   } catch (error) {
     console.error(error)
@@ -249,18 +254,48 @@ function correctMessageId(ctx) {
   return messageId
 }
 
-function genListResources(arr) {
-  const cbBtns = arr.map( resource => {
-      const resourseType =
-        resource.chatType === 'channel' ? '📣'
-        : resource.chatType === 'group' ? '🗣'
-        : resource.chatType === 'supergroup' ? '🗣'
-        : resource.chatType === 'private' ? '👩🏻‍💻'
-        : ' ';
-      return [{ text: `${resourseType} ${resource.title || resource.username}`, callback_data: `selectedSource:${resource.chatID}`, hide: false}]
-  });
-  return cbBtns;
-};
+function genListResources(arr, page) {
+  const correctArray = arr.slice(0, 5)
+  const cbBtns = []
+
+  if (arr) {
+    correctArray.forEach( resource => {
+      const locked = resource.postme.passwordRequired
+        let resourseType =
+          resource.chatType === 'channel' ? '📣'
+          : resource.chatType === 'group' ? '🗣'
+          : resource.chatType === 'supergroup' ? '🗣'
+          : resource.chatType === 'private' ? '👩🏻‍💻'
+          : ' '
+  
+        resourseType = locked ? '🔐 ' + resourseType : resourseType 
+        cbBtns.push( [
+          {
+            text: `${resourseType} ${resource.title || resource.username}`,
+            callback_data: `selectedSource:${resource.chatID}`,
+            hide: false
+          }
+        ]
+      )
+    })
+  }
+
+  const leftArrow = page === 0 ? '⏺' : '⬅️'
+  const rightArrow = arr.length < 6 ? '⏺' : '➡️'
+
+  const leftCbData = leftArrow === '⏺' ? 'plug' : `selectSource:${page - 1}`
+  const rightCbData = rightArrow === '⏺' ? 'plug' : `selectSource:${page + 1}`
+
+  cbBtns.push([
+    {text: `${leftArrow}`, callback_data: leftCbData, hide: false},
+    {text: `Page ${page + 1}`, callback_data: 'plug', hide: false},
+    {text: `${rightArrow}`, callback_data: rightCbData, hide: false},
+  ])
+  cbBtns.push([
+    {text: `👋 Выход 👋 `, callback_data: 'exitScene', hide: false},
+  ])
+  return cbBtns
+}
 
 function checkBox(bool) {
     return bool === true ? '✅' : '⬜️';
