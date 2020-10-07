@@ -1,10 +1,10 @@
-const { postmeMongoListener } = require('../utils/mongoDB/mongoListener');
-const { Extra } = require('telegraf');
+const { postmeMongoListener, default: mongoListener } = require('../utils/mongoDB/mongoListener')
+const { Extra } = require('telegraf')
 
 
 const replys = async (ctx, params) => { // main
     try {
-      const channPostTrue = ctx.channelPost ? (ctx.channelPost.text.slice(8)).toLowerCase() : false;
+      const channPostTrue = ctx.channelPost ? (ctx.channelPost.text.slice(8)).toLowerCase() : false
 
       if ( params === 'receivingСontent' ) {
         await ctx.reply('\u2060', {
@@ -12,17 +12,19 @@ const replys = async (ctx, params) => { // main
             [{ text: '🔄 ЕЩЁ', callback_data: 'replyMore', hide: false}]
           ]},
           disable_notification: true
-        });
-        return undefined;
+        })
+        return undefined
       }
+
       if ( params === 'contentMore') {
-        ctx.telegram.deleteMessage( ctx.chat.id, correctMessageId(ctx) - 1 );
+        ctx.telegram.deleteMessage( ctx.chat.id, correctMessageId(ctx) - 1 )
       }
-      ctx.telegram.deleteMessage( ctx.chat.id, correctMessageId(ctx) );
+
+      ctx.telegram.deleteMessage( ctx.chat.id, correctMessageId(ctx) )
       
-      const welcomeToPostme = await ctx.replyWithSticker( process.env.WAIT_STICK );
+      const welcomeToPostme = await ctx.replyWithSticker( process.env.WAIT_STICK )
   
-      const mediaTypes = await postmeMongoListener( {chatId: welcomeToPostme.chat.id}, 'getMediatypes' );
+      const mediaTypes = await postmeMongoListener( {chatId: welcomeToPostme.chat.id}, 'getMediatypes' )
 
       ctx.session.postme = {
         chatId: welcomeToPostme.chat.id,
@@ -31,40 +33,52 @@ const replys = async (ctx, params) => { // main
       }
     
       if ((ctx.match && ctx.match[1].toLowerCase() === 'options') || params === 'options' || channPostTrue === 'options') {
-        const { chatId, messageId } = ctx.session.postme;
-        ctx.deleteMessage(messageId);
+        const { chatId, messageId } = ctx.session.postme
+        ctx.deleteMessage(messageId)
         const sendOptions = await ctx.reply( 'Настроим репостер ⚙', {reply_markup:
             {inline_keyboard: [
-                [{ text: '📃 Откуда репостим', callback_data: 'selectSource', hide: false}],
+                [{ text: '📃 Откуда репостим', callback_data: 'selectSource:0', hide: false}],
                 [{ text: '📌 Выбрать чат как источник', callback_data: 'setSource', hide: false}],
                 [{ text: '✔️ Выбрать тип контента', callback_data: 'typeSource:current', hide: false }],
-                [{ text: '🗑 Удалить чат из источников', callback_data: 'delSource', hide: false }]
+                [{ text: '🗑 Удалить чат из источников', callback_data: 'delSource', hide: false }],
+                [{ text: '👋 Выход 👋 ', callback_data: 'exitScene', hide: false }],
               ]
             }
-          });
+          })
           ctx.session.postme = {...ctx.session.postme, chatId: sendOptions.chat.id ,messageId: sendOptions.message_id};
-      };
+      }
 
       if ( ((params === 'content') || (params === 'contentMore')) && channPostTrue !== 'options' ) {
-        getPost(ctx, params);
+        getPost(ctx, params)
       }
     } catch (error) {
       console.error(error)
     }
 };
 
-const selectSource = async (ctx) => {
+const selectSource = async (ctx, options) => {
   try {
-    const { chatId, messageId } = ctx.session.postme;
-    const activeResourses = await postmeMongoListener(null, 'selectSource');
-    const customExtra = {};
-    let message = '';
-    if ( !activeResourses ) {
-      message = '🤖Список ресурсов пуст!';
-      customExtra.parse_mode = 'HTML';
-    } else {
-      const cbButtons = genListResources(activeResourses);
-      message = '<b>Выберите один из доступных ресурсов:</b>';
+    const { chatId, messageId } = ctx.session.postme
+    const page = options.page
+    const activeResourses = await postmeMongoListener({
+      page,
+      limit: 5
+    }, 'selectSource')
+
+    const customExtra = {}
+    let message = ''
+    if ( !activeResourses && page === 0 ) {
+      message = '🤖Список ресурсов пуст!'
+      customExtra.parse_mode = 'HTML'
+      setTimeout(() => {
+        ctx.deleteMessage( messageId )
+        ctx.session.postme = {}
+      }, 1000 * 15)
+
+    } else { 
+      const cbButtons = genListResources(activeResourses, page)
+
+      message = '<b>Выберите один из доступных ресурсов:</b>'
       Object.defineProperties( customExtra, {
         'reply_markup': {
           value: { 'inline_keyboard': cbButtons },
@@ -75,15 +89,9 @@ const selectSource = async (ctx) => {
           enumerable: true
         }
       })
-    };
+    }
 
-    await ctx.telegram.editMessageText( chatId, messageId, null, message , customExtra);
-    if ( !activeResourses ) {
-      setTimeout(() => {
-        ctx.deleteMessage( messageId );
-        ctx.session.postme = {};
-      }, 1000 * 15);
-    };
+    await ctx.telegram.editMessageText( chatId, messageId, null, message , customExtra)
     
   } catch (error) {
     console.error(error)
@@ -94,15 +102,18 @@ const selectedSource = async (ctx, listeningChatId) => {
   try {
     const { messageId } = ctx.session.postme;
     const optionsForDb = {
+      messageId,
       listenerChatId: ctx.chat.id,
       listeningChatId
-    };
-    const selected = await postmeMongoListener(optionsForDb, 'listening');
-    await ctx.answerCbQuery(selected, true);
-    ctx.deleteMessage( messageId );
-    ctx.session.postme = {};
+    }
+    const isProtected = await postmeMongoListener( { listeningChatId }, 'protected')
+    if (isProtected) {
+      Object.assign(optionsForDb, isProtected)
+    }
+    ctx.scene.enter( 'postmeAuth', optionsForDb )
+    ctx.session.postme = {}
   } catch (error) {
-    console.error(error);
+    console.error(error)
   }
 }
 
@@ -111,29 +122,32 @@ const setSource = async (ctx, options) => {
     const problem = options && options.problem
         ? options.problem
         : null
-    const { chatId, messageId } = ctx.session.postme;
-    const optionsForDb = {chatId: ctx.chat.id, problem: problem, redis: ctx.redis, userbotExist: false};
+    const { chatId, messageId } = ctx.session.postme
+
+    const sceneState = {
+      chatId: ctx.chat.id,
+      problem: problem,
+      redis: ctx.redis,
+      userbotExist: false
+    }
 
     try {
       const userborov = await ctx.telegram.getChatMember(chatId, process.env.SHEN_VISOR);
       if ( problem !== 'private' && (userborov.status === "left" || userborov.status === "kicked") ) {
-        throw new Error('user not found');
-      };
-      optionsForDb.problem = null;
-      optionsForDb.userbotExist = true;;
+        throw new Error('User not found')
+      }
+      sceneState.problem = null
+      sceneState.userbotExist = true
     } catch (error) {
       if (problem !== 'private') {
-        optionsForDb.problem = 'chatType';
+        sceneState.problem = 'chatType'
       }
     }
 
-    const message = await postmeMongoListener( optionsForDb, 'adding' );
-    await ctx.telegram.editMessageText(chatId, messageId, null, message );
-    
-    ctx.session.postme = {};
-    setTimeout(() => {
-      ctx.deleteMessage(messageId);
-    }, 1000 * 30);
+    ctx.scene.enter('setPassword', sceneState)
+    ctx.deleteMessage(messageId)
+    ctx.session.postme = {}
+
   } catch (error) {
     console.error( error )
   }
@@ -232,23 +246,56 @@ module.exports = {
 }
 
 function correctMessageId(ctx) {
-  const messageId = ctx.callbackQuery ? ctx.callbackQuery.message.message_id :
-    !ctx.message ? ctx.channelPost.message_id : ctx.message.message_id;
-  return messageId;
-};
+  const messageId = ctx.callbackQuery
+    ? ctx.callbackQuery.message.message_id
+    : !ctx.message
+      ? ctx.channelPost.message_id
+      : ctx.message.message_id
+  return messageId
+}
 
-function genListResources(arr) {
-  const cbBtns = arr.map( resource => {
-      const resourseType =
-        resource.chatType === 'channel' ? '📣'
-        : resource.chatType === 'group' ? '🗣'
-        : resource.chatType === 'supergroup' ? '🗣'
-        : resource.chatType === 'private' ? '👩🏻‍💻'
-        : ' ';
-      return [{ text: `${resourseType} ${resource.title || resource.username}`, callback_data: `selectedSource:${resource.chatID}`, hide: false}]
-  });
-  return cbBtns;
-};
+function genListResources(arr, page) {
+  const correctArray = arr.slice(0, 5)
+  const cbBtns = []
+
+  if (arr) {
+    correctArray.forEach( resource => {
+      const locked = resource.postme.passwordRequired
+        let resourseType =
+          resource.chatType === 'channel' ? '📣'
+          : resource.chatType === 'group' ? '🗣'
+          : resource.chatType === 'supergroup' ? '🗣'
+          : resource.chatType === 'private' ? '👩🏻‍💻'
+          : ' '
+  
+        resourseType = locked ? '🔐 ' + resourseType : resourseType 
+        cbBtns.push( [
+          {
+            text: `${resourseType} ${resource.title || resource.username}`,
+            callback_data: `selectedSource:${resource.chatID}`,
+            hide: false
+          }
+        ]
+      )
+    })
+  }
+
+  const leftArrow = page === 0 ? '⏺' : '⬅️'
+  const rightArrow = arr.length < 6 ? '⏺' : '➡️'
+
+  const leftCbData = leftArrow === '⏺' ? 'plug' : `selectSource:${page - 1}`
+  const rightCbData = rightArrow === '⏺' ? 'plug' : `selectSource:${page + 1}`
+
+  cbBtns.push([
+    {text: `${leftArrow}`, callback_data: leftCbData, hide: false},
+    {text: `Page ${page + 1}`, callback_data: 'plug', hide: false},
+    {text: `${rightArrow}`, callback_data: rightCbData, hide: false},
+  ])
+  cbBtns.push([
+    {text: `👋 Выход 👋 `, callback_data: 'exitScene', hide: false},
+  ])
+  return cbBtns
+}
 
 function checkBox(bool) {
     return bool === true ? '✅' : '⬜️';

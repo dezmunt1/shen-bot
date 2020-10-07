@@ -1,10 +1,10 @@
-const {correctTime, formatDate} = require('../dateTransform');
 const articleParser = require('../articleParser');
 const Markup = require('telegraf/markup');
 const {DelorianModel, RespectModel, ArticleModel, UserModel, ChatModel} = require('../../models/schemas');
 const handlerMessages = require('../handlerMessages');
 const {Types} = require('mongoose');
-const {Random} = require('random-js');
+const {Random} = require('random-js')
+const { hashPassword, checkHashPassword } = require('../utils')
 
 const random = new Random();
 
@@ -98,7 +98,15 @@ const dlMongoListener = async function(ctx, newData) {
     console.error( error )
   }
   
-};
+}
+
+const addDelorianModel = data => {
+  if ( !data ) {
+    return
+  }
+  const newEntry = new DelorianModel( data )
+  newEntry.save()
+}
 
 
 const respectMongoListener = function(ctx) {
@@ -339,8 +347,47 @@ const postmeMongoListener = async function( options, type) {
       return 'Ресурс успешно выбран!'
     }
 
+    if ( type === 'protected' ) {
+      try {
+        const listenerChat = await ChatModel.findOne(
+          { chatID: options.listeningChatId },
+          { "postme.passwordRequired": 1 }
+        )
+        const isProtected = listenerChat
+            ? { isProtected: listenerChat.postme.passwordRequired }
+            : false
+        return isProtected
+      } catch (error) {
+        console.error(error)
+      }
+    }
+
+    if ( type === 'getHash' ) {
+      const listenerChat = await ChatModel.findOne(
+        { chatID: options.listeningChatId },
+        { "postme.password": 1 }
+      )
+      const password = listenerChat ? { password: listenerChat.postme.password } : false
+      return password
+    }
+
     if ( type === 'selectSource') {
-      const getActiveResourses = await ChatModel.find({"postme.resourseActive": true}); 
+      const { page, limit } = options
+      const getActiveResourses = await ChatModel
+          .find(
+            {"postme.resourseActive": true},
+            {
+              "chatType": 1,
+              "title": 1,
+              "username": 1,
+              "chatID": 1,
+              "postme.passwordRequired": 1,
+            }
+          )
+          .sort({$natural:-1})
+          .skip( page * limit )
+          .limit( limit + 1 ) // +1 to track the end of data
+
       if ( !getActiveResourses.length ) {
         return(false);
       };
@@ -364,15 +411,27 @@ const postmeMongoListener = async function( options, type) {
       }
 
       if (chat.postme.resourseActive === true) {
-        return `Чат уже в базе данных`;
-      };
-      chat.postme.resourseActive = true;
+        return 'Чат уже в базе данных'
+      }
+
+      chat.postme.resourseActive = true
+      chat.postme.passwordRequired = false
+
+      if (options.setPassword) {
+        chat.postme.passwordRequired = true
+        chat.postme.password = await hashPassword(options.password)
+      }
+      
       await chat.save();
 
-      options.redis.redisEmmiter.emit('adding', {action: 'scrapChat', chatId: chat.chatID, maxMsgId: chat.maxMsgId, userbotExist: options.userbotExist});
+      options.redis.redisEmmiter.emit('adding', {
+        action: 'scrapChat',
+        chatId: chat.chatID,
+        userbotExist: options.userbotExist
+      })
       
-      return('Чат добавлен в базу данных');
-    };
+      return 'Чат добавлен в базу данных'
+    }
 
     if ( type === 'delete' ) {
       await ChatModel.updateMany(
@@ -387,7 +446,10 @@ const postmeMongoListener = async function( options, type) {
           {
             $set: {
               'postme.listeners': [],
-              'postme.resourseActive': false
+              'postme.resourseActive': false,
+              'postme.passwordRequired': false,
+              'postme.password': ''
+
             }
           }, 
           {
@@ -437,13 +499,7 @@ const addChatMongoListener = function(chat, ctx) {
         res.private = privateOrNot;
         if (returnMsgId(ctx)) {
           res.maxMsgId = returnMsgId(ctx);
-        };
-        // try {
-        // 	addNewContent(ctx, res.postme.content);
-        // } catch (e) {
-        // 	console.log(err)
-        // }
-        // res.markModified('postme.content');
+        }
         res.save((err, futureMessage)=>{
           if (err) console.error(err);
           resolve(`${chat.type} ${chat.title || chat.username} успешно обновлен`);
@@ -459,44 +515,11 @@ function returnMsgId(ctx) {
   const msgChannel = ctx.message ? ctx.message.message_id : false;
   const msgGroup = ctx.channelPost ? ctx.channelPost.message_id : false;
   return msgGroup || msgChannel
-};
-
-function addNewContent(ctx, db) { /* content, messageId, allContent */
-  if (ctx.callbackQuery) return; // С нажатых кнопок обнволения собирать не будем
-  const message = ctx.channelPost ? ctx.channelPost : ctx.message;
-  if (message.photo) {
-    handlerMessages.messagePhoto(message, message.message_id, db);
-    return
-  };
-  if (message.animation) {
-    handlerMessages.messageAnimation(message, message.message_id, db);
-    return
-  }
-  if (message.text) {
-    handlerMessages.messageText(message, message.message_id, db);
-    return
-  }
-  if (message.video) {
-    handlerMessages.messageVideo(message, message.message_id, db);
-    return
-  }
-  if (message.video_note) {
-    handlerMessages.messageVideoNote(message, message.message_id, db);
-    return
-  }
-  if (message.voice) {
-    handlerMessages.messageVoiceNote(message, message.message_id, db);
-    return
-  }
-  if (message.audio) {
-    handlerMessages.messageAudio(message, message.message_id, db);
-    return
-  }
-  
 }
 
 module.exports = {
   dlMongoListener,
+  addDelorianModel,
   respectMongoListener,
   articleMongoListener,
   updateArticleResourses,

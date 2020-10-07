@@ -1,16 +1,6 @@
 const Router = require('telegraf/router');
-const {respectMongoListener, postmeMongoListener} = require('./utils/mongoDB/mongoListener');
-const {setSource, delSource, selectSource, selectedSource, replys, typeSource, getPost} = require('./handlers/postme');
-const {sendFutureScene, enteringText} = require('./handlers/delorian');
-const { error } = require('osmosis');
-
-
-
-
-const sendToRegister = [ // export
-    sendFutureScene,
-    enteringText
-];
+const {respectMongoListener} = require('./utils/mongoDB/mongoListener');
+const {setSource, delSource, selectSource, selectedSource, replys, typeSource} = require('./handlers/postme')
 
 const callbackQuerys = new Router((ctx) => {
     if (!ctx.callbackQuery.data) return;
@@ -28,6 +18,10 @@ const callbackQuerys = new Router((ctx) => {
 
 callbackQuerys.on('sendFuture', (ctx) => {
     try {
+        if ( !ctx.session.delorian ) {
+            ctx.answerCbQuery('Этот опрос не актуален, введите /delorian еще раз', false);
+            return ctx.deleteMessage(ctx.callbackQuery.message.message_id)
+        }
         ctx.scene.enter('sendFuture');
         console.log('Вход в сцену sendFuture');
     } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
@@ -36,11 +30,13 @@ callbackQuerys.on('sendFuture', (ctx) => {
 });
 
 callbackQuerys.on('exitScene', (ctx) => {
-    ctx.deleteMessage(ctx.callbackQuery.message.message_id);
-    ctx.answerCbQuery('Ну и не надо', false);
-    ctx.scene.leave();
-    console.log('Выход из сцены');
-});
+    ctx.deleteMessage(ctx.callbackQuery.message.message_id)
+    ctx.answerCbQuery('Ну и не надо', false)
+    if (ctx.scene.current) {
+        ctx.scene.leave()
+        console.log('Выход из сцены')
+    }
+})
 
 // RESPEKT
 
@@ -58,7 +54,8 @@ callbackQuerys.on('dislike', (ctx) => {
 
 callbackQuerys.on('selectSource', (ctx) => {
     try {
-        return selectSource(ctx);
+        const page = ctx.state.cbParams
+        return selectSource( ctx, { page: +page } )
     } catch(e) { 
         ctx.answerCbQuery('Этот опрос не актуален', false);
     };
@@ -66,26 +63,26 @@ callbackQuerys.on('selectSource', (ctx) => {
 
 callbackQuerys.on('selectedSource', (ctx) => {
     try {
-        const resource = ctx.state.cbParams;
-        selectedSource(ctx, resource);
+        const resource = ctx.state.cbParams
+        selectedSource(ctx, resource)
     } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
         ctx.answerCbQuery('Этот опрос не актуален', false);
     };
 });
 
 callbackQuerys.on('setSource', async (ctx) => {
-    try {
-        if (ctx.chat.type !== 'private' && ctx.chat.username) { // публичная группа
-            return setSource(ctx);
-        };
-        if (ctx.chat.type !== 'private' && !ctx.chat.username) { // частная группа
-            return setSource(ctx, {problem: 'chatType'});
-        };
-        return setSource(ctx, {problem: 'private'});
-    } catch(error) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
-        console.error( error );
-    };
-});
+  try {
+    if (ctx.chat.type !== 'private' && ctx.chat.username) { // публичная группа
+      return setSource(ctx)
+    }
+    if (ctx.chat.type !== 'private' && !ctx.chat.username) { // частная группа
+      return setSource(ctx, {problem: 'chatType'})
+    }
+    return setSource(ctx, {problem: 'private'});
+  } catch(error) { 
+    console.error( error )
+  }
+})
 
 callbackQuerys.on('getSource', (ctx) => {
     try {
@@ -102,27 +99,40 @@ callbackQuerys.on('typeSource', (ctx) => {
     } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
         ctx.answerCbQuery('Этот опрос не актуален', false);
     };
-});
+})
+
 callbackQuerys.on('delSource', (ctx) => {
     try {
         delSource(ctx);
-    } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
+    } catch(e) {
         ctx.answerCbQuery('Этот опрос не актуален', false);
     };
-});
+})
+
 callbackQuerys.on('replyMore', (ctx) => {
     return replys(ctx, 'contentMore');
 })
+
 callbackQuerys.on('deleteThisMsg', (ctx) => {
-    try {
-        ctx.deleteMessage(ctx.callbackQuery.message.message_id);
-    } catch(e) { // если нажата кнопка при незапущенной сцене (не найдет зарегистрированной сцены)
-        ctx.answerCbQuery('Этот опрос не актуален', false);
-    };
-});
+  try {
+    ctx.deleteMessage(ctx.callbackQuery.message.message_id)
+  } catch(e) {
+    ctx.answerCbQuery('Этот опрос не актуален', false);
+  }
+})
+
+callbackQuerys.on('postmeSetPassword', ctx => {
+    const setPassword = ctx.state.cbParams
+    const newState = Object.assign( ctx.scene.state, { setPassword } )
+    ctx.scene.leave()
+    ctx.scene.enter( 'chatRegister', newState )
+})
+
+callbackQuerys.on('plug', ctx => {
+  ctx.answerCbQuery(null, false)
+})
 
 
 module.exports =  {
-    callbackQuerys,
-    sendToRegister
-};
+  callbackQuerys
+}
