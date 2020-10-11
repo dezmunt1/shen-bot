@@ -1,5 +1,5 @@
-const axios = require('axios');
-const {cityIn} = require('lvovich');
+const axios = require('axios')
+const {cityIn} = require('lvovich')
 
 module.exports = async (ctx) => {
   const TOKEN = process.env.TOKEN_WEATHER
@@ -16,7 +16,7 @@ module.exports = async (ctx) => {
       return
     })
     .catch( (error) => {
-      console.log(error);
+      console.log(error)
       if (error.response.status === 404) {
         ctx.reply(`Город "${city}" не найден! Проверьте правильность написания и попробуйте снова.`)
       }
