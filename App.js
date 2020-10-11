@@ -21,7 +21,7 @@ const redisEmmiter = new RedisEmmiter({
 
 const redisClient = redis.createClient()
   .on('connect', () => {
-  console.log('Соединение с БД "redis" установлено');
+    console.log('Соединение с БД "redis" установлено')
   })
   .on('error', (err) => {
     throw err
@@ -43,11 +43,12 @@ const limitConfig = {
   limit: 1,
   onLimitExceeded: (ctx) => {
     if (ctx.callbackQuery) {
-      ctx.answerCbQuery('Не надо так часто жать на кнопочку');
+      ctx.answerCbQuery('Не надо так часто жать на кнопочку')
       return
     }
   }
-};
+}
+
 bot.use(rateLimit(limitConfig))
 bot.use(session({
   getSessionKey: (ctx) => {
@@ -68,7 +69,7 @@ scenes.forEach( scene => { //регистрируем сцены
 
 bot.on( 'message', async (ctx, next) => {
   if (ctx.from.id === +process.env.SHEN_VISOR) {
-    postme.replys(ctx, 'receivingСontent');
+    postme.replys(ctx, 'receivingСontent')
   }
   return next(ctx)
 })
@@ -102,7 +103,7 @@ bot.hears(/^(п|П)огода [а-яА-Яa-zA-Z-]+/, weatherApp )
 
 bot.command('delorian', async (ctx) => {
   delorian.replys(ctx)
-});
+})
 
 bot.hears(/\/postme (.+)/, async (ctx) => {
   postme.replys(ctx)
@@ -138,7 +139,7 @@ bot.command('start', dlMongoListener)
 bot.on('callback_query', callbackQuerys)
 
 bot.catch((err) => {
-  console.log('Ooops', err);
+  console.log('Ooops', err)
 })
 
 bot.launch()

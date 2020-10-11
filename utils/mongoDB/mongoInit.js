@@ -1,6 +1,6 @@
-const mongoose = require('mongoose');
+const mongoose = require('mongoose')
 
-let i = 1;
+let i = 1
 
 const connect = async (context) => {
   try {
@@ -18,11 +18,11 @@ const connect = async (context) => {
       } else {
         console.log(`[Server]: ${error}`)
       }
-    });
-    const db = mongoose.connection;
-    db.on('error', console.error.bind(console, 'connection error:')); 
-    db.once('open', console.log.bind(console, `Соединение c БД "${db.name}" установлено`));
-    this.instanse = i++;
+    })
+    const db = mongoose.connection
+    db.on('error', console.error.bind(console, 'connection error:'))
+    db.once('open', console.log.bind(console, `Соединение c БД "${db.name}" установлено`))
+    this.instanse = i++
   } catch (error) {
     console.log(error.message)
   }
@@ -30,13 +30,11 @@ const connect = async (context) => {
 
 class Connect {
   constructor(options={}) {
-    this.path = options.path;
-    this.auth = options.auth;
-    this.instanse = i;
-    connect(this);
+    this.path = options.path
+    this.auth = options.auth
+    this.instanse = i
+    connect(this)
   }
-
-    
 }
 
-module.exports = Connect;
+module.exports = Connect
