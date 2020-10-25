@@ -1,9 +1,11 @@
 const { delorianScenes } = require('./delorian.scene')
 const { postmeScenes } = require('./postme.scene')
+const { adminScenes } = require('./admin.scene')
 
 const scenes = [
   ...delorianScenes,
-  ...postmeScenes
+  ...postmeScenes,
+  ...adminScenes
 ]
 
 module.exports = scenes

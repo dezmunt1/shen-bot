@@ -4,6 +4,7 @@ const getArticle = require('./getArticle')
 const delorian = require('./delorian')
 const respect = require('./respect')
 const postme = require('./postme')
+const admin = require('./admin')
 
 module.exports = {
     etiquette,
@@ -11,5 +12,6 @@ module.exports = {
     getArticle,
     delorian,
     respect,
-    postme
+    postme,
+    admin
 }

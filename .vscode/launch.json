@@ -8,7 +8,7 @@
             "type": "node",
             "request": "launch",
             "name": "Launch Program",
-            "program": "${workspaceFolder}/App.js",
+            "program": "${workspaceFolder}/index.js",
             "runtimeExecutable": "/Users/macbookpro/.nvm/versions/node/v14.4.0/bin/node"
         }
     ]

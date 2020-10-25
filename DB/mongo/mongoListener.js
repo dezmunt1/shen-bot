@@ -1,14 +1,25 @@
-const articleParser = require('../articleParser')
+const redisClient = require('../redis/redisInit')
+const articleParser = require('../../utils/articleParser')
 const Markup = require('telegraf/markup')
-const {DelorianModel, RespectModel, ArticleModel, UserModel, ChatModel} = require('../../models/schemas')
-const handlerMessages = require('../handlerMessages')
-const {Types} = require('mongoose')
-const {Random} = require('random-js')
-const { hashPassword, checkHashPassword } = require('../utils')
+const {
+  DelorianModel,
+  RespectModel,
+  ArticleModel,
+  UserModel,
+  ChatModel,
+  AdminModel
+} = require('./models/schemas')
+const { Types } = require('mongoose')
+const { Random } = require('random-js')
+const { hashPassword, checkHashPassword } = require('../../utils/utils')
+
+
+
+
 
 const random = new Random()
 
-const checkDelorianStore = ( redisClient, ctx ) => {
+const checkDelorianStore = ( ctx ) => {
   let timerId
   const start = async () => {
     clearTimeout( timerId )
@@ -72,13 +83,12 @@ const checkDelorianStore = ( redisClient, ctx ) => {
 }
 
 const dlMongoListener = async function(ctx, newData) {
-  const redis = ctx.redis
-  const check = checkDelorianStore( redis, ctx )
+  const check = checkDelorianStore( ctx )
   try {
     if ( newData ) {
       return check.refresh()
     }
-    await redis.set('delorian', JSON.stringify([]))
+    await redisClient.set('delorian', JSON.stringify([]))
     const now = new Date()
 
     const updateStore = await DelorianModel.find( {remindTime: { $gte: now}, performed: false} )
@@ -92,7 +102,7 @@ const dlMongoListener = async function(ctx, newData) {
       remindsStore.push( {userId: item.userId, remindTime: item.remindTime, dbId: item.id} )
     })
 
-    await redis.set('delorian', JSON.stringify( remindsStore ))
+    await redisClient.set('delorian', JSON.stringify( remindsStore ))
 
     check.start()
 
@@ -141,20 +151,20 @@ const respectMongoListener = function(ctx) {
   }
 }
 
-const articleMongoListener = async function(reqResourse, resourseParser) {
+const articleMongoListener = async function(reqResource, resourceParser) {
   try {
-    if ( !reqResourse ) {
+    if ( !reqResource ) {
       throw new Error('[articleMongoListener]: Request resource type not specified')
     }
 
-    const articleData = await	ArticleModel.findOne({resourse: reqResourse})
+    const articleData = await	ArticleModel.findOne({resource: reqResource})
 
     if ( !articleData ) {
-      const parsedData = await resourseParser()
+      const parsedData = await resourceParser()
       let newRes = new ArticleModel({
-        resourse: reqResourse,
+        resource: reqResource,
         data: parsedData,
-        funcName: resourseParser.name,
+        funcName: resourceParser.name,
         date: new Date()
       })
       await newRes.save()
@@ -169,28 +179,28 @@ const articleMongoListener = async function(reqResourse, resourseParser) {
   }
 }
 
-const updateArticleResourses = async () => {
+const updateArticleResources = async () => {
   try {
-    const allResourses = 	await ArticleModel.find()
-    if ( !allResourses.length ) {
-      throw new Error("[updateArticleResourses]: В БД действующих ресурсов не существует")
+    const allResources = 	await ArticleModel.find()
+    if ( !allResources.length ) {
+      throw new Error("[updateArticleResources]: В БД действующих ресурсов не существует")
     }
 
-    allResourses.forEach( async resourceItem => {
-      const resourse = resourceItem.resourse
+    allResources.forEach( async resourceItem => {
+      const resource = resourceItem.resource
       const funcName = resourceItem.funcName
-      console.log(`Начинаю парсить "${resourse.toUpperCase()}"`)
+      console.log(`Начинаю парсить "${resource.toUpperCase()}"`)
 
       const parsedRosource = await articleParser[funcName]()
       const newDate = new Date()
 
-      const requestResourseUpdate = await ArticleModel.updateMany({_id: resourceItem._id}, {
+      const requestResourceUpdate = await ArticleModel.updateMany({_id: resourceItem._id}, {
         date: newDate,
         data: parsedRosource
       })
 
-      if ( requestResourseUpdate.nModified ) {
-        console.log(`[updateArticleResourses]: Ресурс "${resourse.toUpperCase()}" успешно отпарсен, и записан в БД`)
+      if ( requestResourceUpdate.nModified ) {
+        console.log(`[updateArticleResources]: Ресурс "${resource.toUpperCase()}" успешно отпарсен, и записан в БД`)
       }
     })
 
@@ -236,7 +246,7 @@ const userMongoListener = function(ctx, params) {
   })
 }
 
-const postmeMongoListener = async function( options, type) {
+const postmeMongoListener = async function( options, type ) {
   try {
     if ( type === 'getMediatypes' ) {
       const getMediatypes = await ChatModel.findOne({chatID: options.chatId})
@@ -346,7 +356,7 @@ const postmeMongoListener = async function( options, type) {
       }
 
       const postedMessage = post[0][randomType]
-      options.redis.redisEmmiter.emit(
+      redisClient.emitter.emit(
         'sendPost',
         {
           action: 'sendMessage',
@@ -406,9 +416,9 @@ const postmeMongoListener = async function( options, type) {
 
     if ( type === 'selectSource') {
       const { page, limit } = options
-      const getActiveResourses = await ChatModel
+      const getActiveResources = await ChatModel
           .find(
-            {"postme.resourseActive": true},
+            {"postme.resourceActive": true},
             {
               "chatType": 1,
               "title": 1,
@@ -417,15 +427,15 @@ const postmeMongoListener = async function( options, type) {
               "postme.passwordRequired": 1,
             }
           )
-          .sort({$natural:-1})
+          .sort({'postme.dateActive': -1})
           .skip( page * limit )
           .limit( limit + 1 ) // +1 to track the end of data
 
-      if ( !getActiveResourses.length ) {
+      if ( !getActiveResources.length ) {
         return(false)
       }
 
-      return getActiveResourses
+      return getActiveResources
     }
 
     if ( type === 'adding' ) {
@@ -435,7 +445,7 @@ const postmeMongoListener = async function( options, type) {
       }
 
       if ( options.problem ) {
-        chat.postme.resourseActive = false
+        chat.postme.resourceActive = false
         chat.markModified('postme')
         await chat.save()
         const message = options.problem === 'chatType'
@@ -446,12 +456,13 @@ const postmeMongoListener = async function( options, type) {
         return message
       }
 
-      if (chat.postme.resourseActive === true) {
+      if (chat.postme.resourceActive === true) {
         return 'Чат уже в базе данных'
       }
 
-      chat.postme.resourseActive = true
+      chat.postme.resourceActive = true
       chat.postme.passwordRequired = false
+      chat.postme.dateActive = new Date()
 
       if (options.setPassword) {
         chat.postme.passwordRequired = true
@@ -460,7 +471,7 @@ const postmeMongoListener = async function( options, type) {
       
       await chat.save()
 
-      options.redis.redisEmmiter.emit('adding', {
+      redisClient.emitter.emit('adding', {
         action: 'scrapChat',
         chatId: chat.chatID,
         userbotExist: options.userbotExist
@@ -482,7 +493,7 @@ const postmeMongoListener = async function( options, type) {
           {
             $set: {
               'postme.listeners': [],
-              'postme.resourseActive': false,
+              'postme.resourceActive': false,
               'postme.passwordRequired': false,
               'postme.password': ''
 
@@ -510,8 +521,12 @@ const addChatMongoListener = function(chat, ctx) {
         return
       }
 
-      let privateOrNot = await ctx.getChat()
-      privateOrNot = privateOrNot.username ? false : true
+      const getChat = ctx ? await ctx.getChat() : false
+      const private = !getChat
+          ? chat.private
+          : getChat.username
+            ? false
+            : true
 
       if (res === null) {
         const newChat = new ChatModel({
@@ -522,11 +537,11 @@ const addChatMongoListener = function(chat, ctx) {
           chatType: chat.type,
           username: chat.username || 'Без имени',
           maxMsgId: returnMsgId(ctx),
-          private: privateOrNot,
-          listening: [],   
+          private,
+          listening: [],
         })
 
-        newChat.save((err, futureMessage)=>{
+        newChat.save( (err, futureMessage) => {
           if (err) {
             console.error(err)
           }
@@ -539,8 +554,8 @@ const addChatMongoListener = function(chat, ctx) {
         res.photoLogo = chat.photo
         res.title = chat.title
         res.chatType = chat.type
-        res.username = chat.username || 'Без имени'
-        res.private = privateOrNot
+        res.username = chat.username
+        res.private = private
 
         if (returnMsgId(ctx)) {
           res.maxMsgId = returnMsgId(ctx)
@@ -554,7 +569,69 @@ const addChatMongoListener = function(chat, ctx) {
   })
 }
 
+const adminMongoListener = async function( options, type ) {
+  if ( type === 'checkPassword' ) {
+    const admin = await AdminModel.findOne()
+    const checkPassword = await checkHashPassword(options.password, admin.password)
+    return checkPassword
+  }
+
+  if ( type === 'addingChat' ) {
+    const getChat = options.userBotData
+        ? await new addChatMongoListener({
+          id: options.chatId,
+          description: options.description || 'Без описания',
+          photo: options.photoLogo,
+          title: options.title,
+          type: options.chatType,
+          username: options.username || 'Без имени',
+          private: options.private,
+          listening: [],
+        })
+        : await ChatModel.findOne({chatID: options.chatId})
+
+    if ( !getChat && !options.userBotData ) {
+      redisClient.emitter.emit('getChatInfo', {
+        ...options,
+        action: 'getChatInfo'
+      })
+      return
+    }
+
+    const chat = typeof getChat === 'string'
+        ? await ChatModel.findOne({chatID: options.chatId})
+        : getChat
+
+    if (chat.postme.resourceActive === true) {
+      return 'Чат уже в базе данных'
+    }
+
+    chat.postme.resourceActive = true
+    chat.postme.passwordRequired = false
+    chat.postme.dateActive = new Date()
+
+    if (options.password) {
+      chat.postme.passwordRequired = true
+      chat.postme.password = await hashPassword(options.password)
+    }
+    
+    await chat.save()
+
+    if (options.totalParsing) {
+      redisClient.emitter.emit('adding', {
+        action: 'scrapChat',
+        chatId: chat.chatID,
+        userbotExist: true
+      })
+    }
+    return 'Чат добавлен в базу данных'
+  }
+}
+
 function returnMsgId(ctx) {
+  if ( !ctx ) {
+    return 0
+  }
   const msgChannel = ctx.message ? ctx.message.message_id : false
   const msgGroup = ctx.channelPost ? ctx.channelPost.message_id : false
   return msgGroup || msgChannel
@@ -565,8 +642,9 @@ module.exports = {
   addDelorianModel,
   respectMongoListener,
   articleMongoListener,
-  updateArticleResourses,
+  updateArticleResources,
   userMongoListener,
   postmeMongoListener,
   addChatMongoListener,
+  adminMongoListener
 }

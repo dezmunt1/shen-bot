@@ -1,6 +1,6 @@
 const Router = require('telegraf/router')
-const {respectMongoListener} = require('./utils/mongoDB/mongoListener')
-const {setSource, delSource, selectSource, selectedSource, replys, typeSource} = require('./handlers/postme')
+const { respectMongoListener } = require('../DB/mongo/mongoListener')
+const {setSource, delSource, selectSource, selectedSource, replys, typeSource} = require('../handlers/postme')
 
 const callbackQuerys = new Router((ctx) => {
   if (!ctx.callbackQuery.data) {
@@ -135,7 +135,55 @@ callbackQuerys.on('plug', ctx => {
   ctx.answerCbQuery(null, false)
 })
 
+// ADMIN
 
-module.exports =  {
-  callbackQuerys
-}
+callbackQuerys.on('resourceSetPassword', ctx => {
+  const setPassword = ctx.state.cbParams
+  const newState = Object.assign( ctx.scene.state, { setPassword } )
+  ctx.scene.leave()
+  ctx.scene.enter( 'enterPassword', newState )
+})
+
+callbackQuerys.on('totalParseAdmin', ctx => {
+  const totalParsing = ctx.state.cbParams === "true" ? true : false
+  const newState = Object.assign( ctx.scene.state, { totalParsing } )
+  ctx.scene.leave()
+  ctx.scene.enter( 'finishAddResource', newState )
+})
+
+callbackQuerys.on('selectSourceAdmin', (ctx) => {
+  ctx.answerCbQuery(null, false)
+  const page = ctx.state.cbParams
+  if (ctx.scene.current) {
+    ctx.scene.state.page = +page
+    return ctx.scene.reenter()
+  }
+  ctx.scene.enter('delResource', {page: +page})
+})
+
+callbackQuerys.on('selectedSourceAdmin', (ctx) => {
+  ctx.scene.leave()
+  const resource = +ctx.state.cbParams
+  const page = ctx.scene.state.page
+  ctx.scene.enter('deleteResourceAdmin', {resource, page})
+  ctx.answerCbQuery(null, false)
+})
+
+callbackQuerys.on('btnDelResourceAdmin', (ctx) => {
+  ctx.scene.leave()
+  const newState = {
+    page: ctx.scene.state.page,
+    resource: ctx.scene.state.resource,
+    delete: false
+  }
+  const isDelete = ctx.state.cbParams
+  if (isDelete === "true") {
+    newState.delete = true
+  }
+  ctx.scene.enter('delResource', newState)
+  ctx.answerCbQuery(null, false)
+})
+
+
+
+module.exports = callbackQuerys

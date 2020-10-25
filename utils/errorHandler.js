@@ -1,4 +1,4 @@
-const { postmeMongoListener } = require('../utils/mongoDB/mongoListener')
+const { postmeMongoListener } = require('../DB/mongo/mongoListener')
 
 module.exports = (data, ctx) => {
   const {errMessage, extra} = data

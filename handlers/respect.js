@@ -1,5 +1,5 @@
 const Markup = require('telegraf/markup')
-const {RespectModel} = require('../models/schemas')
+const { RespectModel } = require('../DB/mongo/models/schemas')
 
 module.exports = async (ctx) => {
   ctx.telegram.sendMessage(ctx.chat.id, ctx.match[1], Markup.inlineKeyboard([

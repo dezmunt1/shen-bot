@@ -1,5 +1,6 @@
-const { postmeMongoListener, default: mongoListener } = require('../utils/mongoDB/mongoListener')
+const { postmeMongoListener } = require('../DB/mongo/mongoListener')
 const { Extra } = require('telegraf')
+const { correctMessageId, pagination } =require('../utils/telegram.utils')
 
 
 const replys = async (ctx, params) => { // main
@@ -65,14 +66,14 @@ const selectSource = async (ctx, options) => {
   try {
     const { chatId, messageId } = ctx.session.postme
     const page = options.page
-    const activeResourses = await postmeMongoListener({
+    const activeResources = await postmeMongoListener({
       page,
       limit: 5
     }, 'selectSource')
 
     const customExtra = {}
     let message = ''
-    if ( !activeResourses && page === 0 ) {
+    if ( !activeResources && page === 0 ) {
       message = '🤖Список ресурсов пуст!'
       customExtra.parse_mode = 'HTML'
       setTimeout(() => {
@@ -81,7 +82,11 @@ const selectSource = async (ctx, options) => {
       }, 1000 * 15)
 
     } else { 
-      const cbButtons = genListResources(activeResourses, page)
+      const cbButtons = pagination(activeResources, {
+        page,
+        resourceCbAction: 'selectedSource',
+        paginationCbAction: 'selectSource'
+      })
 
       message = '<b>Выберите один из доступных ресурсов:</b>'
       Object.defineProperties( customExtra, {
@@ -132,7 +137,6 @@ const setSource = async (ctx, options) => {
     const sceneState = {
       chatId: ctx.chat.id,
       problem: problem,
-      redis: ctx.redis,
       userbotExist: false
     }
 
@@ -213,8 +217,7 @@ const getPost = async (ctx, params) => {
     const optionsForDb = {
       chatId,
       mediaTypes,
-      params,
-      redis: ctx.redis
+      params
     }
 
     const postRequest = await postmeMongoListener(optionsForDb, 'getPost')
@@ -245,58 +248,6 @@ module.exports = {
     delSource,
     typeSource,
     getPost,
-}
-
-function correctMessageId(ctx) {
-  const messageId = ctx.callbackQuery
-    ? ctx.callbackQuery.message.message_id
-    : !ctx.message
-      ? ctx.channelPost.message_id
-      : ctx.message.message_id
-  return messageId
-}
-
-function genListResources(arr, page) {
-  const correctArray = arr.slice(0, 5)
-  const cbBtns = []
-
-  if (arr) {
-    correctArray.forEach( resource => {
-      const locked = resource.postme.passwordRequired
-        let resourseType =
-          resource.chatType === 'channel' ? '📣'
-          : resource.chatType === 'group' ? '🗣'
-          : resource.chatType === 'supergroup' ? '🗣'
-          : resource.chatType === 'private' ? '👩🏻‍💻'
-          : ' '
-  
-        resourseType = locked ? '🔐 ' + resourseType : resourseType 
-        cbBtns.push( [
-          {
-            text: `${resourseType} ${resource.title || resource.username}`,
-            callback_data: `selectedSource:${resource.chatID}`,
-            hide: false
-          }
-        ]
-      )
-    })
-  }
-
-  const leftArrow = page === 0 ? '⏺' : '⬅️'
-  const rightArrow = arr.length < 6 ? '⏺' : '➡️'
-
-  const leftCbData = leftArrow === '⏺' ? 'plug' : `selectSource:${page - 1}`
-  const rightCbData = rightArrow === '⏺' ? 'plug' : `selectSource:${page + 1}`
-
-  cbBtns.push([
-    {text: `${leftArrow}`, callback_data: leftCbData, hide: false},
-    {text: `Page ${page + 1}`, callback_data: 'plug', hide: false},
-    {text: `${rightArrow}`, callback_data: rightCbData, hide: false},
-  ])
-  cbBtns.push([
-    {text: `👋 Выход 👋 `, callback_data: 'exitScene', hide: false},
-  ])
-  return cbBtns
 }
 
 function checkBox(bool) {

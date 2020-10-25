@@ -1,31 +1,16 @@
-require('dotenv').config()
 const Telegraf = require('telegraf')
 const rateLimit = require('telegraf-ratelimit')
 const Stage = require('telegraf/stage')
 const session = require('telegraf/session')
-const redis = require('redis')
-const redisPromise = require('./utils/redisPromise')
-const RedisEmmiter = require('node-redis-pubsub')
-const MongoInit = require('./utils/mongoDB/mongoInit')
-const { callbackQuerys } = require('./actions')
-const {dlMongoListener, addChatMongoListener, userMongoListener} = require('./utils/mongoDB/mongoListener')
+const MongoInit = require('./DB/mongo/mongoInit')
+const callbackQuerys = require('./actions/callbackQuerys')
 const tmzEditor = require('./utils/tmzEditor')
 const errorHandler = require('./utils/errorHandler')
-const {etiquette, weatherApp, getArticle, delorian, respect, postme} = require('./handlers')
+const {etiquette, weatherApp, getArticle,
+  delorian, respect, postme, admin} = require('./handlers')
+const { dlMongoListener, addChatMongoListener, userMongoListener } = require('./DB/mongo/mongoListener')
 const scenes = require('./handlers/scenes')
-
-const redisEmmiter = new RedisEmmiter({
-  port: 6379,
-  scope: 'demo'  
-})
-
-const redisClient = redis.createClient()
-  .on('connect', () => {
-    console.log('Соединение с БД "redis" установлено')
-  })
-  .on('error', (err) => {
-    throw err
-  })
+require('./actions/redisEmmiter')
 
 const db = new MongoInit({
   path: process.env.MONGODB_URI,
@@ -60,8 +45,6 @@ bot.use(session({
 }))
 
 bot.use(stage.middleware())
-
-bot.context.redis = {...redisPromise( redisClient ), redisEmmiter}
 
 scenes.forEach( scene => { //регистрируем сцены 
   stage.register(scene)
@@ -114,6 +97,7 @@ bot.command('postme', async (ctx) => {
 
 bot.hears(/\/respect (.+)/, respect)
 bot.hears(/\/tmz\s(.+)/, tmzEditor)
+bot.hears(/\/admin\s(\S+)\s(.+)/, admin)
 bot.hears(/^@error/, (ctx) => {
   let message = (ctx.message.text).split('=')[1]
   message = JSON.parse(message)

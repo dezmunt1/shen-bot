@@ -1,14 +1,14 @@
 const Extra = require('telegraf/extra')
-const {articleMongoListener, updateArticleResourses} = require('../utils/mongoDB/mongoListener')
+const {articleMongoListener, updateArticleResources} = require('../DB/mongo/mongoListener')
 const articleParser = require('../utils/articleParser')
 
 function random(arr) {
   return arr[Math.floor(Math.random() * (arr.length - 0)) + 0]
 }
 
-// Refresh article resourses
+// Refresh article resources
 setInterval( () => {
-  updateArticleResourses()
+  updateArticleResources()
 }, 1000 * 60 * 60 * random( [1, 2, 3] ))
 
 module.exports = async (ctx) => {

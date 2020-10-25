@@ -1,8 +1,7 @@
 const Scene = require('telegraf/scenes/base')
 const { correctTime } = require('../../utils/dateTransform')
 const { timerExit } = require('../../utils/scene.utils')
-const { DelorianModel } = require('../../models/schemas')
-const { dlMongoListener, addDelorianModel } = require('../../utils/mongoDB/mongoListener')
+const { dlMongoListener, addDelorianModel } = require('../../DB/mongo/mongoListener')
 const Markup = require('telegraf/markup')
 
 const sendFutureScene = new Scene('sendFuture')

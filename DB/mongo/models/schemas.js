@@ -1,7 +1,8 @@
 const mongoose = require('mongoose')
+const { hashPasswordSync } = require('../../../utils/utils')
 
 const articleSchema = new mongoose.Schema({
-  resourse: String,
+  resource: String,
   data: Object,
   funcName: String,
   date: Date
@@ -61,12 +62,17 @@ const chatSchema = new mongoose.Schema({
       voicenote: {type: Array, default: []},
       videonote: {type: Array, default: []},
     },
-    resourseActive: {type: Boolean, default: false},
+    resourceActive: {type: Boolean, default: false},
     listening: {type: Number, default: 0},
     listeners: {type: Array, default: []},
     password: {type: String, default: ''},
-    passwordRequired: {type: Boolean, default: false}
+    passwordRequired: {type: Boolean, default: false},
+    dateActive: {type: Date, default: ''},
   },
+})
+
+const adminSchema = new mongoose.Schema({
+  password: {type: String, default: hashPasswordSync(process.env.DEFAULT_PASSWORD)}
 })
 
 const ArticleModel = mongoose.model('ArticleModel', articleSchema)
@@ -74,11 +80,13 @@ const ChatModel = mongoose.model('ChatModel', chatSchema)
 const DelorianModel = mongoose.model('DelorianModel', delorianSchema)
 const RespectModel = mongoose.model('RespectModel', respectSchema)
 const UserModel = mongoose.model('UserModel', userSchema)
+const AdminModel = mongoose.model('AdminModel', adminSchema)
 
 module.exports = {
   DelorianModel,
   RespectModel,
   ArticleModel,
   UserModel,
-  ChatModel
+  ChatModel,
+  AdminModel
 }

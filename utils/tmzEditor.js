@@ -1,4 +1,4 @@
-const {userMongoListener} = require('./mongoDB/mongoListener')
+const { userMongoListener } = require('../DB/mongo/mongoListener')
 
 module.exports = (ctx) => {
   const inputedTmz = ctx.channelPost

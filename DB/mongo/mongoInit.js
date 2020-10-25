@@ -1,4 +1,5 @@
 const mongoose = require('mongoose')
+const { AdminModel } = require('./models/schemas')
 
 let i = 1
 
@@ -12,9 +13,15 @@ const connect = async (context) => {
       dbName: 'delorian',
       useUnifiedTopology: true,
       useCreateIndex: true
-    }, error => {
+    }, async (error) => {
       if (!error) {
         console.log(`[Server]: БД MongoDB успешно подключена`)
+        const admin = await AdminModel.findOne()
+        if ( admin ) {
+          return
+        }
+        new AdminModel().save()
+        console.log(`[Server]: Создана стандартная учётная запись админа, смените пароль`)
       } else {
         console.log(`[Server]: ${error}`)
       }

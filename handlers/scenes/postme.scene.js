@@ -1,7 +1,7 @@
 const Scene = require('telegraf/scenes/base')
 const { timerExit }= require('../../utils/scene.utils')
 const Markup = require('telegraf/markup')
-const { postmeMongoListener } = require('../../utils/mongoDB/mongoListener')
+const { postmeMongoListener } = require('../../DB/mongo/mongoListener')
 const { checkHashPassword } = require('../../utils/utils')
 
 /* 
