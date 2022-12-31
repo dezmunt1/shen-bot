@@ -1,0 +1,42 @@
+{
+	"parser": "@typescript-eslint/parser",
+	"extends": ["airbnb-base", "airbnb-typescript/base", "prettier"],
+	"plugins": ["@typescript-eslint"],
+	"env": {
+		"es6": true,
+		"node": true,
+		"browser": false
+	},
+	"parserOptions": {
+		"project": "tsconfig.json"
+	},
+	"rules": {
+		"no-debugger": "off",
+		"no-console": 0,
+		"semi": ["error", "always"],
+		"no-mixed-requires": "off",
+		"no-restricted-imports": "off",
+		"no-trailing-spaces": "error",
+		"no-unused-vars": "off",
+		"no-use-before-define": "off",
+		"@typescript-eslint/no-use-before-define": ["off"],
+		"@typescript-eslint/no-throw-literal": ["off"],
+		"@typescript-eslint/naming-convention": ["off"],
+		"consistent-return": "off",
+		"radix": "off",
+		"no-restricted-syntax": "off",
+		"no-await-in-loop": "off",
+		"no-underscore-dangle": "off",
+		"no-plusplus": "off",
+		"no-return-assign": "off",
+		"import/order": "off",
+		"no-param-reassign": "off",
+		"no-nested-ternary": "off",
+		"no-bitwise": "off",
+		"no-control-regex": "off",
+		"no-continue": "off",
+		"no-new": "off",
+		"no-extra-boolean-cast": "off",
+		"eqeqeq": "off"
+	}
+}
