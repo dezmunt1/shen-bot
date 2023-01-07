@@ -1,35 +1,56 @@
 import { Scenes, Markup } from 'telegraf';
-import { correctTime } from '@app/utils/dateTransform';
-import { timerExit } from '@app/utils/scene.utils';
-import { dlMongoListener, addDelorianModel } from '@app/DB/mongo/delorian';
-import type { DelorianContext } from './delorian.types';
+import { message } from 'telegraf/filters';
+import { correctTime } from '../../utils/dateTransform';
+import { timerExit } from '../../utils/scene.utils';
+import { dlMongoListener, addDelorianModel } from '../../DB/mongo/delorian';
+import { BotContext } from '@app/types';
+import { getUser } from '../../DB/mongo/user';
+import { WRONG } from '../../constants';
 
 const { leave } = Scenes.Stage;
 
-export const sendFutureScene = new Scenes.BaseScene<DelorianContext>(
-  'sendFuture',
-);
+export const sendFutureScene = new Scenes.BaseScene<BotContext>('sendFuture');
 
-sendFutureScene.enter((ctx) => {
-  timerExit.start(ctx, 'Вы слишком долгий, введите заново /delorian');
-  const { chatId, messageId } = ctx.scene.session.delorian;
-  ctx.telegram.editMessageText(
-    chatId,
-    messageId,
-    undefined,
-    'Введите дату отправления в формате ДД.ММ.ГГГГ в ЧЧ.ММ',
-    Markup.inlineKeyboard([
-      Markup.button.callback('Выйти', 'common:exitScene'),
-    ]),
-  );
+sendFutureScene.enter(async (ctx) => {
+  try {
+    const user = await getUser(ctx);
+    const messageId = ctx.callbackQuery?.message?.message_id;
+    const chatId = ctx.chat?.id;
+
+    if (!messageId || !chatId) {
+      throw WRONG;
+    }
+
+    ctx.session.delorian = {
+      chatId,
+      messageId,
+      gmt: user?.gmt ?? 3,
+      userInputDate: new Date(),
+    };
+
+    timerExit.start(ctx, 'Вы слишком долгий, введите заново /delorian');
+    ctx.telegram.editMessageText(
+      chatId,
+      messageId,
+      undefined,
+      'Введите дату отправления в формате ДД.ММ.ГГГГ в ЧЧ.ММ',
+      Markup.inlineKeyboard([
+        Markup.button.callback('Выйти', 'common:exitScene'),
+      ]),
+    );
+  } catch (error) {
+    console.log(error);
+    ctx.scene.leave();
+    ctx.answerCbQuery(WRONG);
+  }
 });
 
-sendFutureScene.on('text', async (ctx) => {
-  ctx.deleteMessage(ctx.message.message_id);
+sendFutureScene.on(message('text'), async (ctx) => {
+  await ctx.deleteMessage(ctx.message.message_id);
   const isCorrectInput = ctx.message.text.match(
     /\d{1,2}\.\d{1,2}\.\d{4}\sв\s\d{1,2}\.\d{1,2}/g,
   );
-  const { chatId, messageId, gmt } = ctx.scene.session.delorian;
+  const { chatId, messageId, gmt } = ctx.session.delorian;
 
   if (!isCorrectInput) {
     await ctx.deleteMessage(ctx.message.message_id);
@@ -46,7 +67,7 @@ sendFutureScene.on('text', async (ctx) => {
 
   const time = correctTime(ctx.message.text, gmt);
   if (time) {
-    ctx.scene.session.delorian.userInputDate = new Date(time);
+    ctx.session.delorian.userInputDate = new Date(time);
     ctx.scene.enter('enteringText'); // Вход в сцену ВВОДА ТЕКСТА
     ctx.scene.leave();
   } else {
@@ -57,16 +78,14 @@ sendFutureScene.on('text', async (ctx) => {
       undefined,
       'В прошлое сообщений я не отправляю. Чтобы попробовать еще раз, введите `/delorian`',
     );
-    ctx.scene.leave();
+    await ctx.scene.leave();
   }
 });
 
-export const enteringText = new Scenes.BaseScene<DelorianContext>(
-  'enteringText',
-);
+export const enteringText = new Scenes.BaseScene<BotContext>('enteringText');
 
 enteringText.enter(async (ctx) => {
-  const { chatId, messageId } = ctx.scene.session.delorian;
+  const { chatId, messageId } = ctx.session.delorian;
   await ctx.telegram.editMessageText(
     chatId,
     messageId,
@@ -78,8 +97,8 @@ enteringText.enter(async (ctx) => {
   );
 });
 
-enteringText.on('text', async (ctx) => {
-  const { chatId, messageId, userInputDate, gmt } = ctx.scene.session.delorian;
+enteringText.on(message('text'), async (ctx) => {
+  const { chatId, messageId, userInputDate, gmt } = ctx.session.delorian;
 
   try {
     ctx.deleteMessage(ctx.message.message_id);
@@ -106,3 +125,5 @@ enteringText.on('text', async (ctx) => {
     leave();
   }
 });
+
+export default [sendFutureScene, enteringText];

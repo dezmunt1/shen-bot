@@ -1,7 +1,7 @@
-const { delorianScenes } = require('./delorian/delorian.scene');
-const { postmeScenes } = require('./postme.scene');
-const { adminScenes } = require('./admin.scene');
+import { delorianScenes } from './delorian/delorian.scene';
+import { postmeScenes } from './postme.scene';
+import { adminScenes } from './admin.scene';
 
 const scenes = [...delorianScenes, ...postmeScenes, ...adminScenes];
 
-module.exports = scenes;
+export default scenes;

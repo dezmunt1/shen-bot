@@ -1,7 +1,7 @@
 export { etiquette } from './etiquette';
 export { weather } from './weather';
-export { getArticle } from './article';
-export { delorian } from './delorian/delorian';
+export { article } from './article';
+export { delorian } from './delorian';
 export { respect } from './respect/respect';
-export { postme } from './postme';
-export { admin } from './admin';
+export { postmeComposer } from './postme';
+// export { admin } from './admin';

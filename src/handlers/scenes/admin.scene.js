@@ -1,15 +1,15 @@
-const Scene = require('telegraf/scenes/base');
-const Markup = require('telegraf/markup');
-const redisClient = require('../../DB/redis/redisInit');
-const {
+import Scene from 'telegraf/scenes/base';
+import Markup from 'telegraf/markup';
+import redisClient from '../../DB/redis';
+import {
   correctMessageId,
   inlineKeyboard,
   pagination,
-} = require('../../utils/telegram.utils');
-const {
+} from '../../utils/telegram.utils';
+import {
   adminMongoListener,
   postmeMongoListener,
-} = require('../../DB/mongo/mongoListener');
+} from '../../DB/mongo/mongoListener';
 
 // Add Resource Scene
 
@@ -256,7 +256,7 @@ deleteSelectResourceScene.enter((ctx) => {
   ctx.telegram.editMessageText(...props);
 });
 
-module.exports = {
+export default {
   adminScenes: [
     chatIdResourceScene,
     passwordRequestResourceScene,

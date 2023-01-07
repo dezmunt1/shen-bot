@@ -6,7 +6,7 @@ import {
   selectedSource,
   replys,
   typeSource,
-} from '../handlers/postme';
+} from '../handlers/postme/postme';
 
 // POSTME
 

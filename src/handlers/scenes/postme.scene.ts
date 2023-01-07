@@ -1,7 +1,7 @@
 import { Scenes, Context, Markup } from 'telegraf';
 import { timerExit } from '../../utils/scene.utils';
 import { postmeMongoListener } from '../../DB/mongo/mongoListener';
-import { checkHashPassword } from '../../utils/utils';
+import { checkHashPassword } from '../../utils/passwordHash';
 
 interface State {
   messageId: number;

@@ -1,7 +1,7 @@
-const { correctMessageId } = require('../utils/telegram.utils')
-const { adminMongoListener } = require('../DB/mongo/mongoListener')
+import { correctMessageId } from '../utils/telegram.utils';
+import { adminMongoListener } from '../DB/mongo/mongoListener';
 
-module.exports = async (ctx) => {
+export default async (ctx) => {
   const [ password, action ] = ctx.match.slice(1)
   const checkPassword = await adminMongoListener({password}, 'checkPassword')
   const actions = [

@@ -1,4 +1,4 @@
-const Markup = require('telegraf/markup');
+import Markup from 'telegraf/markup';
 
 const correctMessageId = (ctx) => {
   const messageId = ctx.callbackQuery
@@ -52,7 +52,7 @@ const pagination = (arr, options) => {
       cbBtns.push([
         {
           text: `${resourceType} ${resource.title || resource.username}`,
-          callback_data: `${resourceCbAction}:${resource.chatID}`,
+          callback_data: `${resourceCbAction}:${resource.chatId}`,
           hide: false,
         },
       ]);
@@ -78,7 +78,7 @@ const pagination = (arr, options) => {
   return cbBtns;
 };
 
-module.exports = {
+export {
   correctMessageId,
   inlineKeyboard,
   pagination,

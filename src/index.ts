@@ -1,6 +1,4 @@
-require('dotenv').config();
-require('./DB/redis/redisEmitter');
-require('./App');
-
-declare module 'telegraf-ratelimit';
-declare module 'bcryptjs';
+import 'module-alias/register';
+import 'dotenv/config';
+import './DB/redis';
+import './App';

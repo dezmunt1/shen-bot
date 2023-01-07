@@ -1,11 +1,24 @@
-import { Context } from 'telegraf';
+import { Context, Scenes } from 'telegraf';
+import { DelorianSession } from './handlers/delorian/delorian.types';
+import { Update } from 'telegraf/typings/core/types/typegram';
+import {
+  PostmePermissions,
+  PostmeSession,
+} from './handlers/postme/postme.types';
 
-export interface Error {
-  message: string;
+export interface MySessionScene extends Scenes.SceneSessionData {
+  delorian: DelorianSession;
+  postme: PostmeSession;
+}
+export interface MySession extends Scenes.SceneSession<MySessionScene> {
+  delorian: DelorianSession;
+  postme: PostmeSession;
 }
 
-export interface Match {
+export interface BotContext<U = Update> extends Context {
   match: string[];
+  session: MySession;
+  scene: Scenes.SceneContextScene<BotContext<U>, MySessionScene>;
 }
 
-export interface ContextWithMatch extends Context, Match {}
+export type UserPermissions = PostmePermissions;

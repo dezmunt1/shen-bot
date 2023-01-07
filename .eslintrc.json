@@ -37,6 +37,8 @@
 		"no-continue": "off",
 		"no-new": "off",
 		"no-extra-boolean-cast": "off",
-		"eqeqeq": "off"
+		"eqeqeq": "off",
+		"import/first": "off",
+		"import/prefer-default-export": "off"
 	}
 }

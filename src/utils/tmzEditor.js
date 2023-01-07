@@ -1,6 +1,6 @@
-const { userMongoListener } = require('../DB/mongo/mongoListener')
+import { userMongoListener } from '../DB/mongo/mongoListener';
 
-module.exports = (ctx) => {
+export default (ctx) => {
   const inputedTmz = ctx.channelPost
       ? (ctx.channelPost.text.slice(5))
       : ctx.match[1]

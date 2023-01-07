@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { cityIn } from 'lvovich';
-import type { ContextWithMatch } from '@app/types';
+import type { BotContext } from '@app/types';
 
-export const weather = async (ctx: ContextWithMatch) => {
+export const weather = async (ctx: BotContext) => {
   const TOKEN = process.env.TOKEN_WEATHER;
   console.log(TOKEN);
   const city = ctx.match[0].slice(7);

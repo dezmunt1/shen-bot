@@ -1,6 +1,6 @@
 import { Context } from 'telegraf';
 import { DelorianModel } from './models/schemas';
-import redisClient from '../redis/redisInit';
+import { redisClient } from '../redis';
 import toObjectId, { IObjectId } from './utils';
 
 interface Remindes {
@@ -21,6 +21,9 @@ const checkDelorianStore = (ctx: Context) => {
     clearTimeout(timerId);
     try {
       const getRemindes = await redisClient.get('delorian');
+
+      if (!getRemindes) throw 'В Redis Delorian отсутствует';
+
       const remindes: RemindesRedis[] = JSON.parse(getRemindes);
 
       timerId = setTimeout(

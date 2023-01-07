@@ -1,15 +1,14 @@
 import { Context } from 'telegraf';
+import { User } from 'telegraf/typings/core/types/typegram';
 
 export const etiquette = async (ctx: Context) => {
-  // New user in chat
-  if (ctx.chatMember?.new_chat_member) {
-    const { username, first_name } = ctx.chatMember.new_chat_member.user;
+  if (ctx.message && 'new_chat_member' in ctx.message) {
+    const { username, first_name } = ctx.message.new_chat_member as User;
     ctx.reply(`Приветсвую тебя уважаемый (нет) @${username ?? first_name}`);
   }
 
-  // Left user
-  if (ctx.chatMember?.old_chat_member) {
-    const { username, first_name } = ctx.chatMember.old_chat_member.user;
+  if (ctx.message && 'left_chat_member' in ctx.message) {
+    const { username, first_name } = ctx.message.left_chat_member;
     ctx.reply(`Пшёл вон @${username ?? first_name}`);
   }
 };

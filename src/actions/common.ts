@@ -1,20 +1,23 @@
-import { Composer, Context, Scenes } from 'telegraf';
+import { BotContext } from '@app/types';
+import { Composer } from 'telegraf';
 
-export interface ContextWithScene extends Context {
-  scene: Scenes.SceneContextScene<ContextWithScene>;
+export const commonActions = new Composer<BotContext>();
+
+export enum CommonActions {
+  ExitCallback = 'common:exitCallback',
 }
 
-export const commonActions = new Composer<ContextWithScene>();
-
-commonActions.action('common:exitScene', (ctx) => {
+commonActions.action(CommonActions.ExitCallback, async (ctx) => {
   if (ctx.callbackQuery?.message?.message_id) {
     ctx.deleteMessage(ctx.callbackQuery.message.message_id);
   }
-  ctx.answerCbQuery('Ну и не надо');
   if (ctx.scene.current) {
-    ctx.scene.leave();
+    await ctx.answerCbQuery('Ну и не надо');
+    await ctx.scene.leave();
     console.log('Выход из сцены');
+    return undefined;
   }
+  ctx.answerCbQuery();
 });
 
 export default commonActions;

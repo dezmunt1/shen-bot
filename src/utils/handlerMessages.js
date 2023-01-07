@@ -67,4 +67,4 @@ const handlerMessages = {
   },
 }
 
-module.exports = handlerMessages
+export default handlerMessages
