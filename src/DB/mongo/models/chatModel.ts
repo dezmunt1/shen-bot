@@ -1,17 +1,7 @@
-import { Schema, model } from 'mongoose';
+import { Schema, model, Types } from 'mongoose';
+import { ChatDocument } from '../../../contracts';
 
-export interface Chat {
-  chatId: number;
-  description: string;
-  photoLogo: any[]; // TODO: задать корректный тип
-  title: string;
-  chatType: string;
-  username: string;
-  maxMsgId: number;
-  private: boolean;
-}
-
-const chatSchema = new Schema<Chat>({
+const chatSchema = new Schema<ChatDocument>({
   chatId: Number,
   description: String,
   photoLogo: Object,
@@ -20,6 +10,10 @@ const chatSchema = new Schema<Chat>({
   username: String,
   maxMsgId: Number,
   private: Boolean,
+  selectedPostme: {
+    type: Types.ObjectId,
+    ref: 'PostmeModel',
+  },
 });
 
-export const ChatModel = model<Chat>('ChatModel', chatSchema);
+export const ChatModel = model<ChatDocument>('ChatModel', chatSchema);

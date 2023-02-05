@@ -1,26 +1,7 @@
 import { model, Schema, Types } from 'mongoose';
-import { User } from './userModel';
-import { Chat } from './chatModel';
+import { PostmeDocument } from '../../../contracts';
 
-interface Postme {
-  chat: Chat;
-  status: 0 | 1;
-  password: string;
-  protected: boolean;
-  createdDate: Date;
-  subscribers: User[];
-  content: {
-    links: string[];
-    photo: string[];
-    animation: string[];
-    video: string[];
-    audio: string[];
-    voicenote: string[];
-    videonote: string[];
-  };
-}
-
-const postmeSchema = new Schema<Postme>({
+const postmeSchema = new Schema<PostmeDocument>({
   chat: {
     type: Types.ObjectId,
     ref: 'ChatModel',
@@ -32,6 +13,7 @@ const postmeSchema = new Schema<Postme>({
   password: String,
   protected: Boolean,
   createdDate: Date,
+  lastUpdateDate: Date,
   subscribers: [
     {
       type: Types.ObjectId,
@@ -40,34 +22,34 @@ const postmeSchema = new Schema<Postme>({
   ],
   content: {
     links: {
-      type: Array,
+      type: [Types.ObjectId],
       default: [],
     },
     photo: {
-      type: Array,
+      type: [Types.ObjectId],
       default: [],
     },
     animation: {
-      type: Array,
+      type: [Types.ObjectId],
       default: [],
     },
     video: {
-      type: Array,
+      type: [Types.ObjectId],
       default: [],
     },
     audio: {
-      type: Array,
+      type: [Types.ObjectId],
       default: [],
     },
     voicenote: {
-      type: Array,
+      type: [Types.ObjectId],
       default: [],
     },
     videonote: {
-      type: Array,
+      type: [Types.ObjectId],
       default: [],
     },
   },
 });
 
-export const PostmeModel = model<Postme>('PostmeModel', postmeSchema);
+export const PostmeModel = model<PostmeDocument>('PostmeModel', postmeSchema);

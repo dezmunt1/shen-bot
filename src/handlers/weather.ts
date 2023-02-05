@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { cityIn } from 'lvovich';
-import type { BotContext } from '@app/types';
+import type { BotContext } from '../contracts';
 
 export const weather = async (ctx: BotContext) => {
   const TOKEN = process.env.TOKEN_WEATHER;

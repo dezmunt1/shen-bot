@@ -1,7 +1,7 @@
 import { Context } from 'telegraf';
 import { DelorianModel } from './models/schemas';
 import { redisClient } from '../redis';
-import toObjectId, { IObjectId } from './utils';
+import { IObjectId, toObjectId } from './utils';
 
 interface Remindes {
   chatId: number;

@@ -1,5 +1,5 @@
 import { Markup } from 'telegraf';
-import { BotContext } from '@app/types';
+import { BotContext } from '../../contracts';
 import { saveRate } from '../../DB/mongo/respect';
 import { WRONG } from '../../constants';
 

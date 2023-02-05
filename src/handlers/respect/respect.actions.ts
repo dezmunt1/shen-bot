@@ -1,4 +1,4 @@
-import { BotContext } from '@app/types';
+import { BotContext } from '../../contracts';
 import { updateRate } from '../../DB/mongo/respect';
 import { WRONG } from '../../constants';
 import { Composer, Markup } from 'telegraf';

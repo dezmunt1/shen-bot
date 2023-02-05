@@ -1,6 +1,6 @@
 import { Telegraf, session } from 'telegraf';
 import { message } from 'telegraf/filters';
-import { Connect } from './DB/mongo/mongoInit';
+import { Connect } from './DB/mongo';
 import { actionsComposer } from './actions';
 // import tmzEditor from './utils/tmzEditor';
 // import errorHandler from './utils/errorHandler';
@@ -15,9 +15,11 @@ import {
 } from './handlers';
 import { addChat } from './DB/mongo/user';
 import { dlMongoListener } from './DB/mongo/delorian';
-import './DB/redis';
+import { redisEmitter } from './DB/redis';
 import { stage } from './allScenes';
-import { BotContext } from './types';
+import { BotContext } from './contracts';
+
+console.log(process.env.MONGODB_URI);
 
 new Connect(process.env.MONGODB_URI!);
 
@@ -51,13 +53,6 @@ bot.use(session());
 
 bot.use(stage.middleware());
 bot.use(actionsComposer);
-
-// bot.on('message', async (ctx, next) => {
-//   if (ctx.from.id === +process.env.SHEN_VISOR!) {
-//     postme.replys(ctx, 'receivingСontent');
-//   }
-//   return next();
-// });
 
 bot.use(async (ctx, next) => {
   try {
@@ -94,6 +89,19 @@ bot.command('delorian', delorian);
 // });
 
 bot.hears(/\/respect (.+)/, respect);
+bot.hears(/\/set (.+)/, (ctx) => {
+  const chatId = ctx.match[1];
+  if (!chatId || Number.isNaN(+chatId)) {
+    ctx.reply('Некорректный Chat ID');
+    return;
+  }
+  redisEmitter.emit(
+    'adding',
+    JSON.stringify({
+      chatId: +chatId,
+    }),
+  );
+});
 // bot.hears(/\/tmz\s(.+)/, tmzEditor);
 // bot.hears(/\/admin\s(\S+)\s(.+)/, admin);
 // bot.hears(/^@error/, (ctx) => {
@@ -131,7 +139,7 @@ bot.catch((err) => {
   console.log('Ooops', err);
 });
 
-bot.launch();
+bot.launch().then(() => console.log('Бот запущен'));
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));

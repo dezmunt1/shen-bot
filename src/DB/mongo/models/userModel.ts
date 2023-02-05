@@ -1,15 +1,5 @@
 import { Schema, model } from 'mongoose';
-import type { UserPermissions } from '@app/types';
-
-export interface User {
-  firstName: string;
-  userName: string;
-  userId: number;
-  isBot: boolean;
-  lang: string;
-  gmt: number;
-  permissions: UserPermissions[];
-}
+import { User } from '@app/contracts';
 
 const userSchema = new Schema<User>({
   firstName: String,

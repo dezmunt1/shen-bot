@@ -9,7 +9,7 @@ import {
   ChatModel,
   AdminModel,
 } from './models/schemas';
-import toObjectId from './utils';
+import { toObjectId } from './utils';
 import { Random } from 'random-js';
 import { hashPassword, checkHashPassword } from '../../utils/passwordHash';
 

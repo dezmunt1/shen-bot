@@ -3,7 +3,7 @@ import { message } from 'telegraf/filters';
 import { correctTime } from '../../utils/dateTransform';
 import { timerExit } from '../../utils/scene.utils';
 import { dlMongoListener, addDelorianModel } from '../../DB/mongo/delorian';
-import { BotContext } from '@app/types';
+import { BotContext } from '../../contracts';
 import { getUser } from '../../DB/mongo/user';
 import { WRONG } from '../../constants';
 

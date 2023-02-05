@@ -1,9 +1,10 @@
-import { BotContext } from '@app/types';
+import { BotContext } from '../contracts';
 import { Composer } from 'telegraf';
 
 export const commonActions = new Composer<BotContext>();
 
 export enum CommonActions {
+  Skip = 'common:skip',
   ExitCallback = 'common:exitCallback',
 }
 
@@ -20,4 +21,6 @@ commonActions.action(CommonActions.ExitCallback, async (ctx) => {
   ctx.answerCbQuery();
 });
 
-export default commonActions;
+commonActions.action(CommonActions.Skip, async (ctx) => {
+  await ctx.answerCbQuery();
+});

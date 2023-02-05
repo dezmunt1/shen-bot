@@ -1,12 +1,16 @@
-import { hashPassword } from '../../utils/passwordHash';
+import { hashPassword, checkHashPassword } from '../../utils/passwordHash';
 import { ChatModel } from './models/chatModel';
 import { PostmeModel } from './models/postmeModel';
 import { redisEmitter } from '../redis';
+import { getUserPermissions } from './user';
+import { contentType, ContentType } from '../../contracts';
+import { PostmeContent } from '../../handlers/postme/postme.types';
+import { randomFromArray } from './utils';
+import { ContentModel } from './models';
 
 export const getMediatypes = () => undefined;
 export const setMediatypes = () => undefined;
-export const getContent = () => undefined;
-export const setResourceToListening = () => undefined;
+
 export const setProtected = () => undefined;
 export const getPasswordHash = () => undefined;
 
@@ -18,7 +22,7 @@ export const addChatAsResource = async (chatId: number, password?: string) => {
       throw new Error(`Сhat [id: ${chatId}] not found`);
     }
 
-    let postme = await PostmeModel.findById({ chat: chat._id });
+    let postme = await PostmeModel.findOne({ chat: chat._id });
 
     if (!postme) {
       postme = new PostmeModel({
@@ -30,22 +34,190 @@ export const addChatAsResource = async (chatId: number, password?: string) => {
       postme.password = await hashPassword(password);
     }
 
+    if (postme.status === 1) {
+      const protectedMessage = password
+        ? 'Обновлен пароль доступа к ресурсу'
+        : '';
+      throw new Error(
+        `Чат уже в базе, и является активным. ${protectedMessage}`,
+      );
+    }
+
     postme.status = 1;
     postme.protected = !!password;
     postme.createdDate = new Date();
 
     await postme.save();
 
+    if (!postme.isNew) return;
+
     redisEmitter.emit(
       'adding',
       JSON.stringify({
-        action: 'scrapChat',
         chatId: chat.chatId,
       }),
     );
   } catch (error) {
     console.log(error);
     return (error as Error).message;
+  }
+};
+
+export const comparePassword = async (
+  password: string,
+  chatId: number,
+): Promise<boolean> => {
+  try {
+    const chat = await ChatModel.findOne({ chatId });
+
+    if (!chat) throw new Error(`Чат "${chatId}" не найден`);
+
+    const postme = await PostmeModel.findOne({ chat });
+
+    if (!postme)
+      throw new Error(`Чат "${chatId}" не явлеятся доступным ресурсом`);
+
+    return await checkHashPassword(password, postme.password);
+  } catch (error) {
+    console.log(error);
+    return false;
+  }
+};
+
+export const getAvailableChats = async (pageIndex: number) => {
+  try {
+    const resources = await PostmeModel.find({ status: 1 })
+      .skip(pageIndex * 5)
+      .limit(5)
+      .populate('chat');
+    return resources;
+  } catch (error) {
+    console.log(error);
+
+    return [];
+  }
+};
+
+export const deleteSource = async (chatId: number): Promise<boolean> => {
+  try {
+    const resourceChat = await ChatModel.findOne({ chatId });
+    const postme = await PostmeModel.findOne({ chat: resourceChat });
+
+    if (!postme) return false;
+
+    await ChatModel.updateMany(
+      { selectedPostme: postme._id },
+      { selectedPostme: undefined },
+    );
+
+    await PostmeModel.updateOne(
+      { _id: postme._id },
+      { $set: { status: 0, subscribers: [] } },
+    );
+
+    return true;
+  } catch (error) {
+    console.log(error);
+    return false;
+  }
+};
+
+export const setResourceToListening = async (
+  userChatId: number,
+  selectedChatId: string | number,
+): Promise<boolean> => {
+  try {
+    const selectedChat = await ChatModel.findOne({ chatId: selectedChatId });
+    const postme = await PostmeModel.findOne({ chat: selectedChat });
+
+    if (!postme) throw 'Чат выбранный для подписки не найден';
+
+    const userChat = await ChatModel.findOne({ chatId: userChatId });
+
+    if (!userChat) throw 'Чат пользователя не найден';
+
+    userChat.selectedPostme = postme._id;
+
+    const updatePostme = PostmeModel.updateOne(
+      { _id: postme._id },
+      { $addToSet: { subscribers: userChat._id } },
+    );
+
+    await Promise.all([userChat.save(), updatePostme]);
+
+    return true;
+  } catch (error) {
+    console.log(error);
+    return false;
+  }
+};
+
+interface GetContentProps {
+  chatId: number;
+  userId: number;
+}
+
+export const getContent = async (props: GetContentProps) => {
+  const { chatId, userId } = props;
+  try {
+    let selectedContentType: ContentType = 'photo';
+
+    const chat = await ChatModel.findOne(
+      { chatId },
+      { selectedPostme: 1 },
+    ).populate('selectedPostme');
+
+    if (!chat) throw new Error('Чат не найден!');
+    if (!chat.selectedPostme)
+      throw new Error('Сначала выберите доступный ресурс!');
+
+    const permissions = (await getUserPermissions(userId))
+      .map((p) => p.split('.'))
+      .filter(([pType]) => pType === 'postme')
+      .map((p) => p[1] as PostmeContent);
+
+    if (permissions.includes('full')) {
+      selectedContentType =
+        contentType[Math.floor(Math.random() * contentType.length)];
+    } else {
+      const postmeType =
+        permissions[Math.floor(Math.random() * permissions.length)];
+      switch (postmeType) {
+        case 'audio':
+          selectedContentType = randomFromArray(['audio', 'voicenote']);
+          break;
+        case 'links':
+          selectedContentType = 'links';
+          break;
+        case 'photo':
+          selectedContentType = randomFromArray(['photo', 'animation']);
+          break;
+        case 'video':
+          selectedContentType = randomFromArray(['video', 'videonote']);
+          break;
+        default:
+          break;
+      }
+    }
+
+    const randomContentId = randomFromArray(
+      chat.selectedPostme.content[selectedContentType],
+    );
+
+    const content = await ContentModel.findById(randomContentId);
+
+    if (!content) throw new Error('Контент не найден!');
+
+    redisEmitter.emit(
+      'postme:getpost',
+      JSON.stringify({
+        targetChatId: chatId,
+        contentId: content.id,
+        contentType: content.type,
+      }),
+    );
+  } catch (error) {
+    console.log(error);
   }
 };
 

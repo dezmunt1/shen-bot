@@ -1,29 +1,126 @@
 import { CommonActions } from '../../actions/common';
 import { getUserPermissions, toggleUserPermission } from '../../DB/mongo/user';
-import { BotContext } from '@app/types';
+import { BotContext } from '../../contracts';
 import {
   PostmeContent,
   PostmePermissions,
   postmeContents,
+  PostmeActions,
 } from './postme.types';
 import { Composer } from 'telegraf';
-import { ChatMember } from 'telegraf/typings/core/types/typegram';
 import { PostmeScene } from './postme.scene';
+import {
+  addChatAsResource,
+  deleteSource,
+  getAvailableChats,
+  getContent,
+  setResourceToListening,
+} from '../../DB/mongo/postme';
+import { optionsKeyboard } from './postme.common';
+import { pagination, resourceList } from '../../utils/telegram.utils';
 
 export const postmeActions = new Composer<BotContext>();
 
-export enum PostmeActions {
-  SelectSource = 'postme:selectSource',
-  SetAsSource = 'postme:setAsSource',
-  RemoveSource = 'postme:removeSource',
-  SelectContentType = 'postme:selectContentType',
+postmeActions.action(PostmeActions.OpenOptions, async (ctx) => {
+  await ctx.editMessageText('Настроим репостер ⚙', {
+    reply_markup: {
+      inline_keyboard: optionsKeyboard,
+    },
+  });
+});
 
-  SetPassword = 'postme:setPassword',
-}
-
-postmeActions.action(PostmeActions.SelectSource, async (ctx) => {
-  await ctx.answerCbQuery();
+const GetMoreRegex = new RegExp(`${PostmeActions.GetMore}:(.+)`, 'gi');
+postmeActions.action(GetMoreRegex, async (ctx) => {
   await ctx.deleteMessage();
+
+  if (!Number.isNaN(ctx.match[1])) {
+    await ctx.deleteMessage(+ctx.match[1]);
+  }
+  const chatId = ctx.chat?.id;
+  const userId = ctx.from?.id;
+
+  if (!chatId || !userId) return;
+
+  await getContent({ chatId, userId });
+  await ctx.answerCbQuery();
+});
+
+const SelectSourceChatRegex = new RegExp(
+  `${PostmeActions.SelectSourceChat}:(.+):(.+)`,
+  'gi',
+);
+postmeActions.action(SelectSourceChatRegex, async (ctx) => {
+  try {
+    if (!ctx.chat) throw 'Невозможно выбрать чат';
+
+    const recourceChatId = ctx.match[1];
+    const isProtected = ctx.match[2] === 'true';
+
+    if (isProtected) {
+      await ctx.answerCbQuery();
+      await ctx.scene.enter(PostmeScene.CheckPassword, {
+        recourceChatId,
+      });
+      return;
+    }
+
+    const isSuccess = await setResourceToListening(ctx.chat.id, recourceChatId);
+
+    await ctx.answerCbQuery(
+      isSuccess ? 'Чат успешно выбран' : 'Невозможно выбрать чат',
+    );
+  } catch (error) {
+    console.log(error);
+    await ctx.answerCbQuery('Невозможно выбрать чат');
+  }
+});
+
+const SelectSourceRegex = new RegExp(
+  `${PostmeActions.SelectSource}:(.+)`,
+  'gi',
+);
+postmeActions.action(SelectSourceRegex, async (ctx) => {
+  try {
+    const page = Number.isNaN(ctx.match[1]) ? 0 : +ctx.match[1];
+
+    const activeResources = await getAvailableChats(page);
+    await ctx.answerCbQuery();
+
+    if (!activeResources.length) {
+      await ctx.editMessageText('🤖Список ресурсов пуст!', {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: '🔙 Вернуться назад',
+                callback_data: PostmeActions.OpenOptions,
+              },
+            ],
+          ],
+        },
+      });
+      return;
+    }
+    const paginationButtons = pagination({
+      action: PostmeActions.SelectSource,
+      pageIndex: page,
+      listCount: activeResources.length,
+    });
+
+    const listButtons = resourceList(
+      activeResources,
+      PostmeActions.SelectSourceChat,
+    );
+
+    ctx.editMessageText('<b>Выберите один из доступных ресурсов:</b>', {
+      reply_markup: {
+        inline_keyboard: [...listButtons, ...paginationButtons],
+      },
+      parse_mode: 'HTML',
+    });
+  } catch (error) {
+    console.error(error);
+  }
 });
 
 postmeActions.action(PostmeActions.SetAsSource, async (ctx) => {
@@ -83,12 +180,33 @@ postmeActions.action(setPasswordRegex, async (ctx) => {
     await ctx.scene.enter(PostmeScene.EnterPassword);
     return undefined;
   }
+
+  if (!ctx.chat) {
+    await ctx.answerCbQuery('Не возможно выбрать чат как источник');
+    await ctx.deleteMessage();
+    return;
+  }
+
+  const errorMessage = await addChatAsResource(ctx.chat.id);
+
+  if (errorMessage) {
+    await ctx.reply(errorMessage);
+    return;
+  }
+  ctx.reply('Чат успешно добавлен в базу!');
 });
 
 postmeActions.action(PostmeActions.RemoveSource, async (ctx) => {
+  const ERR_MESSAGE = 'Ошибка удаления, обратитесь к администратору';
+  if (!ctx.chat) {
+    await ctx.answerCbQuery(ERR_MESSAGE);
+    return;
+  }
+
+  const isDelete = await deleteSource(ctx.chat.id);
+
+  await ctx.editMessageText(isDelete ? 'Ресурс успешно удален' : ERR_MESSAGE);
   await ctx.answerCbQuery();
-  await ctx.deleteMessage();
-  await ctx.reply('Remove source');
 });
 
 postmeActions.action(PostmeActions.SelectContentType, async (ctx) => {

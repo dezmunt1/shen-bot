@@ -1,7 +1,6 @@
 import { Context } from 'telegraf';
-import { ChatModel } from './models/schemas';
-import { UserModel } from './models/userModel';
-import { UserPermissions } from '@app/types';
+import { ChatModel, UserModel } from './models';
+import { UserPermissions } from '../../contracts';
 
 export const addChat = async (ctx: Context) => {
   try {
@@ -34,7 +33,10 @@ export const addChat = async (ctx: Context) => {
       } успешно добавлен в базу`;
     }
 
-    chat.photoLogo = incomingChat.photo;
+    chat.photoLogo = {
+      big: incomingChat?.photo?.big_file_unique_id,
+      small: incomingChat?.photo?.small_file_unique_id,
+    };
     chat.chatType = incomingChat.type;
     chat.description = description;
     chat.title = title;

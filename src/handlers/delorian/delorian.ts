@@ -1,6 +1,6 @@
 import { Markup, NarrowedContext } from 'telegraf';
 import { Update, Message } from 'telegraf/typings/core/types/typegram';
-import { BotContext } from '@app/types';
+import { BotContext } from '../../contracts';
 
 export const delorian = async (
   ctx: NarrowedContext<

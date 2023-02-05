@@ -1,6 +1,6 @@
 import { getArticle, updateArticles } from '../../DB/mongo/article';
 import { xakepParser, comssParser, habrParser } from './article.util';
-import type { BotContext } from '@app/types';
+import type { BotContext } from '../../contracts';
 
 function random<T>(arr: T[]) {
   return arr[Math.floor(Math.random() * (arr.length - 0)) + 0];

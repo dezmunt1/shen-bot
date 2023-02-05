@@ -1,43 +1,31 @@
 import { Composer } from 'telegraf';
-import { BotContext } from '@app/types';
+import { BotContext } from '../../contracts';
 import { channelPost } from 'telegraf/filters';
-import { CommonActions } from '../../actions/common';
-import { PostmeActions } from './postme.actions';
+import { optionsKeyboard } from './postme.common';
+import { getContent } from '../../DB/mongo/postme';
+import { PostmeActions } from './postme.types';
 
 export const postmeComposer = new Composer<BotContext>();
 
-const optionsKeyboard = [
-  [
-    {
-      text: '📃 Откуда репостим',
-      callback_data: PostmeActions.SelectSource,
-    },
-  ],
-  [
-    {
-      text: '📌 Выбрать чат как источник',
-      callback_data: PostmeActions.SetAsSource,
-    },
-  ],
-  [
-    {
-      text: '✔️ Выбрать тип контента',
-      callback_data: PostmeActions.SelectContentType,
-    },
-  ],
-  [
-    {
-      text: '🗑 Удалить чат из источников',
-      callback_data: PostmeActions.RemoveSource,
-    },
-  ],
-  [
-    {
-      text: '👋 Выход 👋 ',
-      callback_data: CommonActions.ExitCallback,
-    },
-  ],
-];
+postmeComposer.on('message', async (ctx, next) => {
+  if (ctx.from.id === +process.env.SHEN_VISOR!) {
+    await ctx.reply('\u2060', {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: '🔄 ЕЩЁ',
+              callback_data: `${PostmeActions.GetMore}:${ctx.message.message_id}`,
+            },
+          ],
+        ],
+      },
+      disable_notification: true,
+    });
+    return undefined;
+  }
+  return next();
+});
 
 postmeComposer.on(channelPost('text'), async (ctx) => {
   const [command, options] = ctx.channelPost.text.split(' ');
@@ -60,6 +48,16 @@ postmeComposer.hears(/\/postme options/, async (ctx) => {
       inline_keyboard: optionsKeyboard,
     },
   });
+});
+postmeComposer.hears(/\/postme/, async (ctx) => {
+  try {
+    await ctx.deleteMessage();
+    const { id: chatId } = ctx.chat;
+    const { id: userId } = ctx.from;
+    await getContent({ chatId, userId });
+  } catch (error) {
+    console.log(error);
+  }
 });
 
 // export const postme = async (ctx: BotContext, actionsType: PostmeType) => {

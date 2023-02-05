@@ -1,4 +1,4 @@
-import { BotContext } from '@app/types';
+import { BotContext } from '../../contracts';
 import { Composer } from 'telegraf';
 
 export const delorianActions = new Composer<BotContext>();
