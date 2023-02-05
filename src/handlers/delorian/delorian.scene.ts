@@ -1,7 +1,6 @@
 import { Scenes, Markup } from 'telegraf';
 import { message } from 'telegraf/filters';
 import { correctTime } from '../../utils/dateTransform';
-import { timerExit } from '../../utils/scene.utils';
 import { dlMongoListener, addDelorianModel } from '../../DB/mongo/delorian';
 import { BotContext } from '../../contracts';
 import { getUser } from '../../DB/mongo/user';
@@ -28,7 +27,6 @@ sendFutureScene.enter(async (ctx) => {
       userInputDate: new Date(),
     };
 
-    timerExit.start(ctx, 'Вы слишком долгий, введите заново /delorian');
     ctx.telegram.editMessageText(
       chatId,
       messageId,
@@ -71,7 +69,6 @@ sendFutureScene.on(message('text'), async (ctx) => {
     ctx.scene.enter('enteringText'); // Вход в сцену ВВОДА ТЕКСТА
     ctx.scene.leave();
   } else {
-    timerExit.stop();
     await ctx.telegram.editMessageText(
       chatId,
       messageId,
@@ -118,7 +115,6 @@ enteringText.on(message('text'), async (ctx) => {
       gmt,
     });
     ctx.scene.leave();
-    timerExit.stop();
     dlMongoListener(ctx, true);
   } catch (error: any) {
     console.log(error.message);

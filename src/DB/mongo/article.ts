@@ -1,6 +1,6 @@
 import { ArticleModel } from './models/schemas';
 import articleParser from '../../handlers/article/article.util';
-import type { Resource } from '@app/handlers/article/article.types';
+import type { Resource } from '../../handlers/article/article.types';
 
 type ResourceParser = () => Promise<string[]>;
 

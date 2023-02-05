@@ -1,5 +1,5 @@
 import { Schema, model } from 'mongoose';
-import { User } from '@app/contracts';
+import { User } from '../../../contracts';
 
 const userSchema = new Schema<User>({
   firstName: String,
