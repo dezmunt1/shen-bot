@@ -4,6 +4,17 @@ on:
   push:
     branches: [ "dev" ]
 
+env:
+  HASH_SALT: ${{ secrets.SHEN_BOT_HASH_SALT }}
+  MONGODB_URI: ${{ secrets.SHEN_BOT_MONGODB_URI }}
+  SHEN_VISOR: ${{ secrets.SHEN_BOT_NAME_SHEN_VISOR }}
+  REDIS_SESSION_HOST: ${{ secrets.SHEN_BOT_REDIS_SESSION_HOST }}
+  REDIS_SESSION_PORT: ${{ secrets.SHEN_BOT_REDIS_SESSION_PORT }}
+  SHEN_VISOR: ${{ secrets.SHEN_BOT_SHEN_VISOR }}
+  TELETOKEN_DEV: ${{ secrets.SHEN_BOT_TELETOKEN_DEV }}
+  TOKEN_WEATHER: ${{ secrets.SHEN_BOT_TOKEN_WEATHER }}
+  WRAPAPI_TOKEN: ${{ secrets.SHEN_BOT_WRAPAPI_TOKEN }}
+
 jobs:
   build:
 
@@ -26,9 +37,11 @@ jobs:
     
 
   deploy:
+
+    runs-on: self-hosted
+
+    needs: build
+
     steps:
-      - name: Start App
-      env:
-        BOT_TOKEN: ${{ secrets.SECRET_FRONEND_BOT_TOKEN }}
-        MEME_API: ${{ secrets.SECRET_MEME_API }}
+    - name: Start App
       run: pm2 delete -s shen_bot || :; pm2 start npm --name "shen_bot" -- start; pm2 save
