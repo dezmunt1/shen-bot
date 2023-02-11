@@ -17,6 +17,7 @@ export const getPasswordHash = () => undefined;
 export const addChatAsResource = async (chatId: number, password?: string) => {
   try {
     const chat = await ChatModel.findOne({ chatId });
+    let isNewResource = false;
 
     if (!chat) {
       throw new Error(`Сhat [id: ${chatId}] not found`);
@@ -28,6 +29,7 @@ export const addChatAsResource = async (chatId: number, password?: string) => {
       postme = new PostmeModel({
         chat: chat._id,
       });
+      isNewResource = true;
     }
 
     if (password) {
@@ -49,7 +51,7 @@ export const addChatAsResource = async (chatId: number, password?: string) => {
 
     await postme.save();
 
-    if (!postme.isNew) return;
+    if (!isNewResource) return;
 
     redisEmitter.emit(
       'adding',
