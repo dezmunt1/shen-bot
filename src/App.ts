@@ -13,7 +13,7 @@ import {
   //   admin,
   article,
 } from './handlers';
-import { addChat } from './DB/mongo/user';
+import { addChat, getUser } from './DB/mongo/user';
 import { dlMongoListener } from './DB/mongo/delorian';
 import { redisEmitter } from './DB/redis';
 import { stage } from './allScenes';
@@ -57,10 +57,7 @@ bot.use(actionsComposer);
 bot.use(async (ctx, next) => {
   try {
     await addChat(ctx);
-    // console.log(messageChatInfo);
-
-    // const messageUserInfo = await getUser(ctx);
-    // // console.log(messageUserInfo);
+    await getUser(ctx);
 
     const start = Date.now();
     return await next().then(() => {
@@ -80,13 +77,6 @@ bot.hears(/^(с|С)татья (.+)/, article);
 bot.hears(/^(п|П)огода [а-яА-Яa-zA-Z-]+/, weather);
 
 bot.command('delorian', delorian);
-
-// bot.hears(/\/postme (.+)/, async (ctx) => {
-//   postme(ctx);
-// });
-// bot.command('postme', async (ctx) => {
-//   postme.replys(ctx, 'content');
-// });
 
 bot.hears(/\/respect (.+)/, respect);
 bot.hears(/\/set (.+)/, (ctx) => {

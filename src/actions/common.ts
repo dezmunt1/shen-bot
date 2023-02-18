@@ -9,16 +9,21 @@ export enum CommonActions {
 }
 
 commonActions.action(CommonActions.ExitCallback, async (ctx) => {
-  if (ctx.callbackQuery?.message?.message_id) {
-    ctx.deleteMessage(ctx.callbackQuery.message.message_id);
+  try {
+    if (ctx.callbackQuery?.message?.message_id) {
+      ctx.deleteMessage(ctx.callbackQuery.message.message_id);
+    }
+    if (ctx.scene.current) {
+      await ctx.answerCbQuery('Ну и не надо');
+      await ctx.scene.leave();
+      console.log('Выход из сцены');
+      return undefined;
+    }
+  } catch (error) {
+    console.log(error);
+  } finally {
+    await ctx.answerCbQuery();
   }
-  if (ctx.scene.current) {
-    await ctx.answerCbQuery('Ну и не надо');
-    await ctx.scene.leave();
-    console.log('Выход из сцены');
-    return undefined;
-  }
-  ctx.answerCbQuery();
 });
 
 commonActions.action(CommonActions.Skip, async (ctx) => {

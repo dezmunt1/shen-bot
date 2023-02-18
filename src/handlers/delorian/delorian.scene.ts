@@ -44,54 +44,63 @@ sendFutureScene.enter(async (ctx) => {
 });
 
 sendFutureScene.on(message('text'), async (ctx) => {
-  await ctx.deleteMessage(ctx.message.message_id);
-  const isCorrectInput = ctx.message.text.match(
-    /\d{1,2}\.\d{1,2}\.\d{4}\sв\s\d{1,2}\.\d{1,2}/g,
-  );
-  const { chatId, messageId, gmt } = ctx.session.delorian;
-
-  if (!isCorrectInput) {
+  try {
     await ctx.deleteMessage(ctx.message.message_id);
-    return ctx.telegram.editMessageText(
-      chatId,
-      messageId,
-      undefined,
-      'Должна быть запись в формате ДД.ММ.ГГГГ в ЧЧ.ММ',
-      Markup.inlineKeyboard([
-        Markup.button.callback('Выйти', 'common:exitScene'),
-      ]),
+    const isCorrectInput = ctx.message.text.match(
+      /\d{1,2}\.\d{1,2}\.\d{4}\sв\s\d{1,2}\.\d{1,2}/g,
     );
-  }
+    const { chatId, messageId, gmt } = ctx.session.delorian;
 
-  const time = correctTime(ctx.message.text, gmt);
-  if (time) {
-    ctx.session.delorian.userInputDate = new Date(time);
-    ctx.scene.enter('enteringText'); // Вход в сцену ВВОДА ТЕКСТА
-    ctx.scene.leave();
-  } else {
-    await ctx.telegram.editMessageText(
-      chatId,
-      messageId,
-      undefined,
-      'В прошлое сообщений я не отправляю. Чтобы попробовать еще раз, введите `/delorian`',
-    );
-    await ctx.scene.leave();
+    if (!isCorrectInput) {
+      await ctx.deleteMessage(ctx.message.message_id);
+      await ctx.telegram.editMessageText(
+        chatId,
+        messageId,
+        undefined,
+        'Должна быть запись в формате ДД.ММ.ГГГГ в ЧЧ.ММ',
+        Markup.inlineKeyboard([
+          Markup.button.callback('Выйти', 'common:exitScene'),
+        ]),
+      );
+      return;
+    }
+
+    const time = correctTime(ctx.message.text, gmt);
+    if (time) {
+      ctx.session.delorian.userInputDate = new Date(time);
+      ctx.scene.enter('enteringText'); // Вход в сцену ВВОДА ТЕКСТА
+      ctx.scene.leave();
+    } else {
+      await ctx.telegram.editMessageText(
+        chatId,
+        messageId,
+        undefined,
+        'В прошлое сообщений я не отправляю. Чтобы попробовать еще раз, введите `/delorian`',
+      );
+      await ctx.scene.leave();
+    }
+  } catch (error) {
+    console.log(error);
   }
 });
 
 export const enteringText = new Scenes.BaseScene<BotContext>('enteringText');
 
 enteringText.enter(async (ctx) => {
-  const { chatId, messageId } = ctx.session.delorian;
-  await ctx.telegram.editMessageText(
-    chatId,
-    messageId,
-    undefined,
-    'Введите отправляемый текст',
-    Markup.inlineKeyboard([
-      Markup.button.callback('Выйти', 'common:exitScene'),
-    ]),
-  );
+  try {
+    const { chatId, messageId } = ctx.session.delorian;
+    await ctx.telegram.editMessageText(
+      chatId,
+      messageId,
+      undefined,
+      'Введите отправляемый текст',
+      Markup.inlineKeyboard([
+        Markup.button.callback('Выйти', 'common:exitScene'),
+      ]),
+    );
+  } catch (error) {
+    console.log(error);
+  }
 });
 
 enteringText.on(message('text'), async (ctx) => {

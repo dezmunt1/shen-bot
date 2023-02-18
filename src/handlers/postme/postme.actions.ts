@@ -22,27 +22,36 @@ import { pagination, resourceList } from '../../utils/telegram.utils';
 export const postmeActions = new Composer<BotContext>();
 
 postmeActions.action(PostmeActions.OpenOptions, async (ctx) => {
-  await ctx.editMessageText('Настроим репостер ⚙', {
-    reply_markup: {
-      inline_keyboard: optionsKeyboard,
-    },
-  });
+  try {
+    await ctx.editMessageText('Настроим репостер ⚙', {
+      reply_markup: {
+        inline_keyboard: optionsKeyboard,
+      },
+    });
+  } catch (error) {
+    console.log(error);
+  }
 });
 
 const GetMoreRegex = new RegExp(`${PostmeActions.GetMore}:(.+)`, 'gi');
 postmeActions.action(GetMoreRegex, async (ctx) => {
-  await ctx.deleteMessage();
+  try {
+    await ctx.deleteMessage();
 
-  if (!Number.isNaN(ctx.match[1])) {
-    await ctx.deleteMessage(+ctx.match[1]);
+    if (!Number.isNaN(ctx.match[1])) {
+      await ctx.deleteMessage(+ctx.match[1]);
+    }
+    const chatId = ctx.chat?.id;
+    const userId = ctx.from?.id;
+
+    if (!chatId || !userId) return;
+
+    await getContent({ chatId, userId });
+  } catch (error) {
+    console.log(error);
+  } finally {
+    await ctx.answerCbQuery();
   }
-  const chatId = ctx.chat?.id;
-  const userId = ctx.from?.id;
-
-  if (!chatId || !userId) return;
-
-  await getContent({ chatId, userId });
-  await ctx.answerCbQuery();
 });
 
 const SelectSourceChatRegex = new RegExp(
@@ -51,7 +60,7 @@ const SelectSourceChatRegex = new RegExp(
 );
 postmeActions.action(SelectSourceChatRegex, async (ctx) => {
   try {
-    if (!ctx.chat) throw 'Невозможно выбрать чат';
+    if (!ctx.chat || !ctx.from) throw 'Невозможно выбрать чат';
 
     const recourceChatId = ctx.match[1];
     const isProtected = ctx.match[2] === 'true';
@@ -64,7 +73,7 @@ postmeActions.action(SelectSourceChatRegex, async (ctx) => {
       return;
     }
 
-    const isSuccess = await setResourceToListening(ctx.chat.id, recourceChatId);
+    const isSuccess = await setResourceToListening(ctx.from.id, recourceChatId);
 
     await ctx.answerCbQuery(
       isSuccess ? 'Чат успешно выбран' : 'Невозможно выбрать чат',
@@ -124,108 +133,125 @@ postmeActions.action(SelectSourceRegex, async (ctx) => {
 });
 
 postmeActions.action(PostmeActions.SetAsSource, async (ctx) => {
-  await ctx.answerCbQuery();
+  try {
+    const isPrivate = ctx.chat?.type === 'private';
+    // const isPrivateGroup = ctx.chat?.type === 'group';
+    // const isChannel = ctx.chat?.type === 'channel';
 
-  const isPrivate = ctx.chat?.type === 'private';
-  const isPrivateGroup = ctx.chat?.type === 'group';
-  const isChannel = ctx.chat?.type === 'channel';
+    if (isPrivate) {
+      await ctx.editMessageText(
+        'Нельзя установить личную переписку как источник контента',
+      );
+      return;
+    }
 
-  if (isPrivate) {
-    await ctx.editMessageText(
-      'Нельзя установить личную переписку как источник контента',
-    );
-    return;
-  }
+    const userborov = await ctx
+      .getChatMember(+process.env.SHEN_VISOR!)
+      .catch((e) => console.log(e));
 
-  const userborov = await ctx
-    .getChatMember(+process.env.SHEN_VISOR!)
-    .catch((e) => console.log(e));
+    if (
+      !userborov ||
+      (userborov && ['left', 'kicked'].includes(userborov.status))
+    ) {
+      await ctx.editMessageText(
+        'Userbot отсутствует в чате, обратитесь к администратору',
+      );
+      return;
+    }
 
-  if (
-    !userborov ||
-    (userborov && ['left', 'kicked'].includes(userborov.status))
-  ) {
-    await ctx.editMessageText(
-      'Userbot отсутствует в чате, обратитесь к администратору',
-    );
-    return;
-  }
-
-  await ctx.answerCbQuery();
-
-  ctx.editMessageText('Вы хотите установить пароль на свой источник?', {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: 'Не устанавливать',
-            callback_data: `${PostmeActions.SetPassword}:false`,
-          },
-          {
-            text: 'Установить',
-            callback_data: `${PostmeActions.SetPassword}:true`,
-          },
+    ctx.editMessageText('Вы хотите установить пароль на свой источник?', {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: 'Не устанавливать',
+              callback_data: `${PostmeActions.SetPassword}:false`,
+            },
+            {
+              text: 'Установить',
+              callback_data: `${PostmeActions.SetPassword}:true`,
+            },
+          ],
         ],
-      ],
-    },
-  });
+      },
+    });
+  } catch (error) {
+    console.log(error);
+  } finally {
+    await ctx.answerCbQuery();
+  }
 });
 
 const setPasswordRegex = new RegExp(`${PostmeActions.SetPassword}:(.+)`, 'gi');
 
 postmeActions.action(setPasswordRegex, async (ctx) => {
-  const passwordEnable = JSON.parse(ctx.match[1]) as boolean;
+  try {
+    const passwordEnable = JSON.parse(ctx.match[1]) as boolean;
 
-  if (passwordEnable) {
-    await ctx.scene.enter(PostmeScene.EnterPassword);
-    return undefined;
+    if (passwordEnable) {
+      await ctx.scene.enter(PostmeScene.EnterPassword);
+      return undefined;
+    }
+
+    if (!ctx.chat) {
+      await ctx.answerCbQuery('Не возможно выбрать чат как источник');
+      await ctx.deleteMessage();
+      return;
+    }
+
+    const errorMessage = await addChatAsResource(ctx.chat.id);
+
+    if (errorMessage) {
+      await ctx.reply(errorMessage);
+      return;
+    }
+    ctx.reply('Чат успешно добавлен в базу!');
+  } catch (error) {
+    console.log(error);
+    await ctx.answerCbQuery();
   }
-
-  if (!ctx.chat) {
-    await ctx.answerCbQuery('Не возможно выбрать чат как источник');
-    await ctx.deleteMessage();
-    return;
-  }
-
-  const errorMessage = await addChatAsResource(ctx.chat.id);
-
-  if (errorMessage) {
-    await ctx.reply(errorMessage);
-    return;
-  }
-  ctx.reply('Чат успешно добавлен в базу!');
 });
 
 postmeActions.action(PostmeActions.RemoveSource, async (ctx) => {
-  const ERR_MESSAGE = 'Ошибка удаления, обратитесь к администратору';
-  if (!ctx.chat) {
-    await ctx.answerCbQuery(ERR_MESSAGE);
-    return;
+  try {
+    const ERR_MESSAGE = 'Ошибка удаления, обратитесь к администратору';
+    if (!ctx.chat) {
+      await ctx.answerCbQuery(ERR_MESSAGE);
+      return;
+    }
+
+    const isDelete = await deleteSource(ctx.chat.id);
+
+    await ctx.editMessageText(isDelete ? 'Ресурс успешно удален' : ERR_MESSAGE);
+  } catch (error) {
+    console.log(error);
+  } finally {
+    await ctx.answerCbQuery();
   }
-
-  const isDelete = await deleteSource(ctx.chat.id);
-
-  await ctx.editMessageText(isDelete ? 'Ресурс успешно удален' : ERR_MESSAGE);
-  await ctx.answerCbQuery();
 });
 
 postmeActions.action(PostmeActions.SelectContentType, async (ctx) => {
-  if (!ctx.from) {
+  try {
+    if (!ctx.from) {
+      await ctx.answerCbQuery();
+      return;
+    }
+
+    const permissions = await getUserPermissions(ctx.from.id);
+
     await ctx.answerCbQuery();
-    return;
+
+    const cbButtons = selectContentButtons(postmePermissions(permissions));
+
+    await ctx.editMessageText('Выберите какой контент вы готовы получать', {
+      reply_markup: {
+        inline_keyboard: cbButtons,
+      },
+    });
+  } catch (error) {
+    console.log(error);
+    await ctx.answerCbQuery();
   }
-
-  const permissions = await getUserPermissions(ctx.from.id);
-
-  await ctx.answerCbQuery();
-
-  const cbButtons = selectContentButtons(postmePermissions(permissions));
-
-  await ctx.editMessageText('Выберите какой контент вы готовы получать', {
-    reply_markup: {
-      inline_keyboard: cbButtons,
-    },
-  });
 });
 
 const sourceTypeRegex = new RegExp(
@@ -234,26 +260,41 @@ const sourceTypeRegex = new RegExp(
 );
 
 postmeActions.action(sourceTypeRegex, async (ctx) => {
-  const action = ctx.match[1] as PostmeContent;
+  try {
+    const action = ctx.match[1] as PostmeContent;
+    const { username, first_name } = ctx.from ?? {};
 
-  if (!ctx.from || !postmeContents.includes(action)) {
+    if (!ctx.from || !postmeContents.includes(action)) {
+      await ctx.answerCbQuery();
+      return;
+    }
+
+    const permission = `postme.${action}` as PostmePermissions;
+
+    const newPermissions = await toggleUserPermission(ctx.from.id, permission);
+
     await ctx.answerCbQuery();
-    return;
+
+    const cbButtons = selectContentButtons(postmePermissions(newPermissions));
+
+    const userName = username
+      ? `@${username}`
+      : first_name
+      ? `${first_name}`
+      : 'nobody';
+
+    await ctx.editMessageText(
+      `[${userName}] Выберите какой контент вы готовы получать`,
+      {
+        reply_markup: {
+          inline_keyboard: cbButtons,
+        },
+      },
+    );
+  } catch (error) {
+    console.log(error);
+    await ctx.answerCbQuery();
   }
-
-  const permission = `postme.${action}` as PostmePermissions;
-
-  const newPermissions = await toggleUserPermission(ctx.from.id, permission);
-
-  await ctx.answerCbQuery();
-
-  const cbButtons = selectContentButtons(postmePermissions(newPermissions));
-
-  await ctx.editMessageText('Выберите какой контент вы готовы получать', {
-    reply_markup: {
-      inline_keyboard: cbButtons,
-    },
-  });
 });
 
 function checkBox(checked: boolean) {
@@ -268,10 +309,13 @@ function postmePermissions(
   permissions: PostmePermissions[],
 ): PostmePermissionsReturned {
   const result: PostmePermissionsReturned = {
+    animation: false,
     audio: false,
     photo: false,
-    video: false,
     links: false,
+    video: false,
+    videonote: false,
+    voicenote: false,
     full: false,
   };
 
@@ -293,22 +337,38 @@ function selectContentButtons(validPermissons: PostmePermissionsReturned) {
         callback_data: `${PostmeActions.SelectContentType}:photo`,
       },
       {
-        text: `🎥 Видео/GIF ${checkBox(validPermissons.video)}`,
-        callback_data: `${PostmeActions.SelectContentType}:video`,
-      },
-      {
-        text: `🔗 Ссылки ${checkBox(validPermissons.links)}`,
-        callback_data: `${PostmeActions.SelectContentType}:links`,
+        text: `🖼 GIF ${checkBox(validPermissons.animation)}`,
+        callback_data: `${PostmeActions.SelectContentType}:animation`,
       },
     ],
     [
       {
-        text: `♾ Любой ${checkBox(validPermissons.full)}`,
-        callback_data: `${PostmeActions.SelectContentType}:full`,
+        text: `🎥 Видео ${checkBox(validPermissons.video)}`,
+        callback_data: `${PostmeActions.SelectContentType}:video`,
       },
+      {
+        text: `🎥 Кругляш ${checkBox(validPermissons.videonote)}`,
+        callback_data: `${PostmeActions.SelectContentType}:videonote`,
+      },
+    ],
+    [
       {
         text: `🎵 Аудио ${checkBox(validPermissons.audio)}`,
         callback_data: `${PostmeActions.SelectContentType}:audio`,
+      },
+      {
+        text: `🎵 Войс ${checkBox(validPermissons.voicenote)}`,
+        callback_data: `${PostmeActions.SelectContentType}:voicenote`,
+      },
+    ],
+    [
+      {
+        text: `🔗 Ссылки ${checkBox(validPermissons.links)}`,
+        callback_data: `${PostmeActions.SelectContentType}:links`,
+      },
+      {
+        text: `♾ Любой ${checkBox(validPermissons.full)}`,
+        callback_data: `${PostmeActions.SelectContentType}:full`,
       },
     ],
     [

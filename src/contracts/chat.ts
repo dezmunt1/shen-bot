@@ -1,5 +1,4 @@
 import { Document } from 'mongoose';
-import type { Postme } from './postme';
 
 export interface Chat {
   chatId: number;
@@ -10,7 +9,6 @@ export interface Chat {
   username?: string;
   title?: string;
   description?: string;
-  selectedPostme?: Postme;
 }
 
 export interface ChatDocument extends Chat, Document {}

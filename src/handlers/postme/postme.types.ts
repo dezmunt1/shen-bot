@@ -1,8 +1,11 @@
 export const postmeContents = [
-  'links',
-  'photo',
-  'video',
+  'animation',
   'audio',
+  'photo',
+  'links',
+  'video',
+  'videonote',
+  'voicenote',
   'full',
 ] as const;
 
