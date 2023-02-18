@@ -46,7 +46,9 @@ postmeActions.action(GetMoreRegex, async (ctx) => {
 
     if (!chatId || !userId) return;
 
-    await getContent({ chatId, userId });
+    const errorMessage = await getContent({ chatId, userId });
+    if (!errorMessage) return;
+    await ctx.reply(errorMessage);
   } catch (error) {
     console.log(error);
   } finally {
