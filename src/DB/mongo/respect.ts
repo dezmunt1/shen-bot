@@ -1,4 +1,4 @@
-import { RespectModel } from './models/schemas';
+import { RespectModel } from '@shenlibs/dto';
 
 interface Rate {
   chatId: number;

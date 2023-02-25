@@ -1,65 +1,47 @@
 import { CommonActions } from '../actions/common';
 import { InlineKeyboardButton } from 'telegraf/typings/core/types/typegram';
-import { Postme } from '../contracts';
-// const correctMessageId = (ctx) => {
-//   const messageId = ctx.callbackQuery
-//     ? ctx.callbackQuery.message.message_id
-//     : !ctx.message
-//     ? ctx.channelPost.message_id
-//     : ctx.message.message_id;
-//   return messageId;
-// };
+import { Chat, Postme } from '@shenlibs/dto';
 
-// const inlineKeyboard = (buttons) => {
-//   function getButtons(buttonArray) {
-//     const button = buttonArray.map((btn, row, arr) => {
-//       const [caption, action] = btn;
-//       if (typeof caption !== 'string') {
-//         return getButtons(btn);
-//       }
-//       const correctButton =
-//         arr === buttons
-//           ? [Markup.callbackButton(caption, action)]
-//           : Markup.callbackButton(caption, action);
+type ChatType = 'channel' | 'group' | 'supergroup' | 'private' | undefined;
 
-//       return correctButton;
-//     });
-//     return button;
-//   }
-//   const buttonsArr = getButtons(buttons);
-//   return Markup.inlineKeyboard(buttonsArr).extra();
-// };
+function getResourceIcon(chatType: ChatType) {
+  return chatType === 'channel'
+    ? '📣'
+    : chatType === 'group'
+    ? '🗣'
+    : chatType === 'supergroup'
+    ? '🗣'
+    : chatType === 'private'
+    ? '👩🏻‍💻'
+    : ' ';
+}
 
 export const resourceList = (
-  resources: Postme[],
+  resources: Postme[] | Chat[],
   selectResourceAction: string,
 ) => {
   const buttons = resources.map((resource) => {
-    const { chatType, title, username, chatId } = resource.chat;
-    let resourceIcon =
-      chatType === 'channel'
-        ? '📣'
-        : chatType === 'group'
-        ? '🗣'
-        : chatType === 'supergroup'
-        ? '🗣'
-        : chatType === 'private'
-        ? '👩🏻‍💻'
-        : ' ';
+    const isProtected = 'protected' in resource && resource.protected;
 
-    if (resource.protected) {
+    const { chatType, title, username, chatId } =
+      'protected' in resource ? resource.chat : resource;
+
+    let resourceIcon = getResourceIcon(chatType as ChatType);
+
+    if (isProtected) {
       resourceIcon = `🔐 ${resourceIcon}`;
     }
     return [
       {
         text: `${resourceIcon} ${title ?? username}`,
         callback_data: `${selectResourceAction}:${chatId}:${Boolean(
-          resource.protected,
+          isProtected,
         )}`,
         hide: false,
       },
     ];
   });
+
   return buttons;
 };
 

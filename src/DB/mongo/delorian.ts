@@ -1,5 +1,5 @@
 import { Context } from 'telegraf';
-import { DelorianModel } from './models/schemas';
+import { DelorianModel } from '@shenlibs/dto';
 import { redisClient } from '../redis';
 import { IObjectId, toObjectId } from './utils';
 

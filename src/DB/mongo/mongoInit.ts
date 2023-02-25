@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-import { AdminModel } from './models/schemas';
 
 let i = 1;
 
@@ -20,14 +19,6 @@ export class Connect {
       await mongoose.connect(this.path, async (error) => {
         if (!error) {
           console.log(`[Server]: БД MongoDB успешно подключена`);
-          const admin = await AdminModel.findOne();
-          if (admin) {
-            return;
-          }
-          new AdminModel().save();
-          console.log(
-            `[Server]: Создана стандартная учётная запись админа, смените пароль`,
-          );
         } else {
           console.log(`[Server]: ${error}`);
         }

@@ -6,6 +6,7 @@ import {
   PostmePermissions,
   postmeContents,
   PostmeActions,
+  PostmeAdminActions,
 } from './postme.types';
 import { Composer } from 'telegraf';
 import { PostmeScene } from './postme.scene';
@@ -13,13 +14,119 @@ import {
   addChatAsResource,
   deleteSource,
   getAvailableChats,
+  getAvailableChatsForParsing,
   getContent,
   setResourceToListening,
 } from '../../DB/mongo/postme';
-import { optionsKeyboard } from './postme.common';
+import { optionsKeyboard, adminOptionsKeyboard } from './postme.common';
 import { pagination, resourceList } from '../../utils/telegram.utils';
 
 export const postmeActions = new Composer<BotContext>();
+
+postmeActions.action(PostmeActions.AdminMode, async (ctx) => {
+  try {
+    const isAdmin = process.env.SHEN_ADMIN === ctx.from?.id.toString();
+
+    if (!isAdmin) {
+      await ctx.answerCbQuery('Доступ запрещен');
+      return;
+    }
+
+    await ctx.answerCbQuery('Доступ разрешен');
+
+    await ctx.editMessageText('⭐ репостер - административный режим', {
+      reply_markup: {
+        inline_keyboard: adminOptionsKeyboard,
+      },
+    });
+  } catch (error) {
+    console.log(error);
+  }
+});
+
+const AvailableSourcesRegex = new RegExp(
+  `${PostmeAdminActions.AvailableSources}:(.+)`,
+  'gi',
+);
+
+postmeActions.action(AvailableSourcesRegex, async (ctx) => {
+  try {
+    const isAdmin = process.env.SHEN_ADMIN === ctx.from?.id.toString();
+
+    if (!isAdmin) {
+      await ctx.answerCbQuery('Доступ запрещен');
+      return;
+    }
+
+    const page = Number.isNaN(ctx.match[1]) ? 0 : +ctx.match[1];
+
+    const activeResources = await getAvailableChatsForParsing(page);
+
+    if (!activeResources.length) {
+      await ctx.editMessageText('🤖Список ресурсов пуст!', {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: '🔙 Вернуться назад',
+                callback_data: PostmeActions.OpenOptions,
+              },
+            ],
+          ],
+        },
+      });
+      return;
+    }
+
+    const paginationButtons = pagination({
+      action: PostmeAdminActions.AvailableSources,
+      pageIndex: page,
+      listCount: activeResources.length,
+    });
+
+    const listButtons = resourceList(
+      activeResources,
+      PostmeAdminActions.SetAsSources,
+    );
+
+    ctx.editMessageText('<b>Выберите один из доступных ресурсов:</b>', {
+      reply_markup: {
+        inline_keyboard: [...listButtons, ...paginationButtons],
+      },
+      parse_mode: 'HTML',
+    });
+  } catch (error) {
+    console.log(error);
+  } finally {
+    await ctx.answerCbQuery();
+  }
+});
+
+const SetAsSourceAdminRegex = new RegExp(
+  `${PostmeAdminActions.SetAsSources}:(.+):(.+)`,
+  'gi',
+);
+
+postmeActions.action(SetAsSourceAdminRegex, async (ctx) => {
+  try {
+    const chatId = ctx.match[1];
+    await ctx.deleteMessage();
+    if (!chatId || Number.isNaN(Number(chatId))) {
+      await ctx.reply('Отсутствует chatId');
+      return;
+    }
+
+    const errorMessage = await addChatAsResource(Number(chatId));
+
+    if (errorMessage) {
+      await ctx.reply(errorMessage);
+      return;
+    }
+    ctx.reply('Начинаю парсить!');
+  } catch (error) {
+    console.log(error);
+  }
+});
 
 postmeActions.action(PostmeActions.OpenOptions, async (ctx) => {
   try {
@@ -77,9 +184,13 @@ postmeActions.action(SelectSourceChatRegex, async (ctx) => {
 
     const isSuccess = await setResourceToListening(ctx.from.id, recourceChatId);
 
-    await ctx.answerCbQuery(
-      isSuccess ? 'Чат успешно выбран' : 'Невозможно выбрать чат',
-    );
+    if (isSuccess) {
+      await ctx.answerCbQuery('Чат успешно выбран');
+      await ctx.deleteMessage();
+      return;
+    }
+
+    await ctx.answerCbQuery('Невозможно выбрать чат');
   } catch (error) {
     console.log(error);
     await ctx.answerCbQuery('Невозможно выбрать чат');
