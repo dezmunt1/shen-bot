@@ -27,4 +27,11 @@ export enum PostmeActions {
   SelectContentType = 'postme:selectContentType',
   SetPassword = 'postme:setPassword',
   GetMore = 'postme:getMore',
+  AdminMode = 'postme:adminMode',
+}
+
+export enum PostmeAdminActions {
+  AvailableSources = 'postme-admin:availableSources',
+  SetAsSources = 'postme-admin:setAsSources',
+  DeleteResource = 'postme-admin:deleteResource',
 }

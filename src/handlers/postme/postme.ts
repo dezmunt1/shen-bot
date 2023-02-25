@@ -1,7 +1,7 @@
 import { Composer } from 'telegraf';
 import { BotContext } from '../../contracts';
 import { channelPost } from 'telegraf/filters';
-import { optionsKeyboard } from './postme.common';
+import { adminOption, optionsKeyboard } from './postme.common';
 import { getContent } from '../../DB/mongo/postme';
 import { PostmeActions } from './postme.types';
 
@@ -51,10 +51,18 @@ postmeComposer.on(channelPost('text'), async (ctx) => {
 postmeComposer.hears(/\/postme options/, async (ctx) => {
   try {
     await ctx.deleteMessage();
+    const inline_keyboard = [...optionsKeyboard];
+
+    const isAdmin = process.env.SHEN_ADMIN === ctx.from.id.toString();
+
+    if (isAdmin) {
+      const backButton = inline_keyboard.pop();
+      inline_keyboard.push(adminOption, backButton!);
+    }
 
     await ctx.reply('Настроим репостер ⚙', {
       reply_markup: {
-        inline_keyboard: optionsKeyboard,
+        inline_keyboard,
       },
     });
   } catch (error) {

@@ -27,5 +27,5 @@ commonActions.action(CommonActions.ExitCallback, async (ctx) => {
 });
 
 commonActions.action(CommonActions.Skip, async (ctx) => {
-  await ctx.answerCbQuery();
+  await ctx.answerCbQuery().catch();
 });

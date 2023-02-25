@@ -1,11 +1,15 @@
 import { hashPassword, checkHashPassword } from '../../utils/passwordHash';
-import { ChatModel } from './models/chatModel';
-import { PostmeModel } from './models/postmeModel';
+import {
+  ChatModel,
+  PostmeModel,
+  contentType,
+  ContentType,
+  ContentModel,
+  UserModel,
+} from '@shenlibs/dto';
 import { redisEmitter } from '../redis';
-import { contentType, ContentType } from '../../contracts';
 import { PostmeContent } from '../../handlers/postme/postme.types';
 import { randomFromArray } from './utils';
-import { ContentModel, UserModel } from './models';
 
 export const getMediatypes = () => undefined;
 export const setMediatypes = () => undefined;
@@ -91,6 +95,17 @@ export const getAvailableChats = async (pageIndex: number) => {
       .skip(pageIndex * 5)
       .limit(5)
       .populate('chat');
+    return resources;
+  } catch (error) {
+    console.log(error);
+    return [];
+  }
+};
+export const getAvailableChatsForParsing = async (pageIndex: number) => {
+  try {
+    const resources = await ChatModel.find()
+      .skip(pageIndex * 5)
+      .limit(5);
     return resources;
   } catch (error) {
     console.log(error);

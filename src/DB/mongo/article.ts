@@ -1,4 +1,4 @@
-import { ArticleModel } from './models/schemas';
+import { ArticleModel } from '@shenlibs/dto';
 import articleParser from '../../handlers/article/article.util';
 import type { Resource } from '../../handlers/article/article.types';
 

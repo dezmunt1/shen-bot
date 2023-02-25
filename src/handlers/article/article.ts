@@ -35,7 +35,7 @@ export const article = async (ctx: BotContext) => {
 
     if (articleResource === 'list' || articleResource === 'список') {
       await ctx.reply(
-        `<b>Список доступных ресурсов:</b>\n1. "код" или "код дурова".\n2. "хакер".\n3. "комсс" или "comss".`,
+        `<b>Список доступных ресурсов:</b>\n1. "habr" или "хабр".\n2. "хакер".\n3. "комсс" или "comss".`,
         { parse_mode: 'HTML' },
       );
       return;

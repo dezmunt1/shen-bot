@@ -1,5 +1,5 @@
 import { Context } from 'telegraf';
-import { ChatModel, UserModel } from './models';
+import { ChatModel, UserModel } from '@shenlibs/dto';
 import { UserPermissions } from '../../contracts';
 
 export const addChat = async (ctx: Context) => {
