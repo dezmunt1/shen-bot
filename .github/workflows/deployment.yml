@@ -14,6 +14,7 @@ env:
   TELETOKEN_DEV: ${{ secrets.SHEN_BOT_TELETOKEN_DEV }}
   TOKEN_WEATHER: ${{ secrets.SHEN_BOT_TOKEN_WEATHER }}
   WRAPAPI_TOKEN: ${{ secrets.SHEN_BOT_WRAPAPI_TOKEN }}
+  SHEN_ADMIN: ${{ secrets.SHEN_BOT_SHEN_ADMIN }}
 
 jobs:
   build:
