@@ -21,6 +21,8 @@ import {
 import { optionsKeyboard, adminOptionsKeyboard } from './postme.common';
 import { pagination, resourceList } from '../../utils/telegram.utils';
 
+const ERR_MESSAGE = 'Ошибка удаления, обратитесь к администратору';
+
 export const postmeActions = new Composer<BotContext>();
 
 postmeActions.action(PostmeActions.AdminMode, async (ctx) => {
@@ -111,12 +113,20 @@ postmeActions.action(SetAsSourceAdminRegex, async (ctx) => {
   try {
     const chatId = ctx.match[1];
     await ctx.deleteMessage();
+
     if (!chatId || Number.isNaN(Number(chatId))) {
       await ctx.reply('Отсутствует chatId');
       return;
     }
 
-    const errorMessage = await addChatAsResource(Number(chatId));
+    if (!ctx.from) {
+      await ctx.reply('Отсутствует информация о юзере');
+      return;
+    }
+
+    const { id } = ctx.from;
+
+    const errorMessage = await addChatAsResource(Number(chatId), id);
 
     if (errorMessage) {
       await ctx.reply(errorMessage);
@@ -153,9 +163,9 @@ postmeActions.action(GetMoreRegex, async (ctx) => {
 
     if (!chatId || !userId) return;
 
-    const errorMessage = await getContent({ chatId, userId });
-    if (!errorMessage) return;
-    await ctx.reply(errorMessage);
+    const { message, buttons } = await getContent({ chatId, userId });
+    if (!message) return;
+    await ctx.reply(message, { reply_markup: buttons });
   } catch (error) {
     console.log(error);
   } finally {
@@ -306,13 +316,13 @@ postmeActions.action(setPasswordRegex, async (ctx) => {
       return undefined;
     }
 
-    if (!ctx.chat) {
+    if (!ctx.chat || !ctx.from?.id) {
       await ctx.answerCbQuery('Не возможно выбрать чат как источник');
       await ctx.deleteMessage();
       return;
     }
 
-    const errorMessage = await addChatAsResource(ctx.chat.id);
+    const errorMessage = await addChatAsResource(ctx.chat.id, ctx.from.id);
 
     if (errorMessage) {
       await ctx.reply(errorMessage);
@@ -327,13 +337,24 @@ postmeActions.action(setPasswordRegex, async (ctx) => {
 
 postmeActions.action(PostmeActions.RemoveSource, async (ctx) => {
   try {
-    const ERR_MESSAGE = 'Ошибка удаления, обратитесь к администратору';
-    if (!ctx.chat) {
+    const userId = ctx.from?.id;
+
+    if (!ctx.chat || !userId) {
       await ctx.answerCbQuery(ERR_MESSAGE);
       return;
     }
 
-    const isDelete = await deleteSource(ctx.chat.id);
+    const admins = await ctx.getChatAdministrators();
+
+    const isAdmin =
+      admins.some((admin) => admin.user.id === userId) ||
+      process.env.SHEN_ADMIN === userId.toString();
+
+    const isDelete = await deleteSource({
+      chatId: ctx.chat.id,
+      userId,
+      isAdmin,
+    });
 
     await ctx.editMessageText(isDelete ? 'Ресурс успешно удален' : ERR_MESSAGE);
   } catch (error) {

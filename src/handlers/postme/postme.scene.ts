@@ -146,7 +146,15 @@ confirmPasswordScene.on(message('text'), async (ctx) => {
 
     await ctx.deleteMessage(dialogMessageId);
 
-    const errorMessage = await addChatAsResource(chatId, password);
+    if (!ctx.from) {
+      await ctx.reply('Отсутствует информация о юзере');
+      await ctx.scene.leave();
+      return;
+    }
+
+    const { id } = ctx.from;
+
+    const errorMessage = await addChatAsResource(chatId, id, password);
 
     if (errorMessage) {
       await ctx.reply(errorMessage);
