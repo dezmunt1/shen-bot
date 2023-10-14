@@ -75,9 +75,9 @@ postmeComposer.hears(/\/postme/, async (ctx) => {
     await ctx.deleteMessage();
     const { id: chatId } = ctx.chat;
     const { id: userId } = ctx.from;
-    const errorMessage = await getContent({ chatId, userId });
-    if (!errorMessage) return;
-    await ctx.reply(errorMessage);
+    const { message, buttons } = await getContent({ chatId, userId });
+    if (!message) return;
+    await ctx.reply(message, { reply_markup: buttons });
   } catch (error) {
     console.log(error);
   }

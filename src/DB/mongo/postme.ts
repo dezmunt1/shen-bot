@@ -8,8 +8,12 @@ import {
   UserModel,
 } from '@shenlibs/dto';
 import { redisEmitter } from '../redis';
-import { PostmeContent } from '../../handlers/postme/postme.types';
+import {
+  PostmeActions,
+  PostmeContent,
+} from '../../handlers/postme/postme.types';
 import { randomFromArray } from './utils';
+import { InlineKeyboardMarkup } from 'telegraf/typings/core/types/typegram';
 
 export const getMediatypes = () => undefined;
 export const setMediatypes = () => undefined;
@@ -17,13 +21,21 @@ export const setMediatypes = () => undefined;
 export const setProtected = () => undefined;
 export const getPasswordHash = () => undefined;
 
-export const addChatAsResource = async (chatId: number, password?: string) => {
+export const addChatAsResource = async (
+  chatId: number,
+  userId: number,
+  password?: string,
+) => {
   try {
     const chat = await ChatModel.findOne({ chatId });
+    const user = await UserModel.findOne({ userId });
     let isNewResource = false;
 
     if (!chat) {
       throw new Error(`Сhat [id: ${chatId}] not found`);
+    }
+    if (!user) {
+      throw new Error(`User [id: ${userId}] not found`);
     }
 
     let postme = await PostmeModel.findOne({ chat: chat._id });
@@ -31,6 +43,7 @@ export const addChatAsResource = async (chatId: number, password?: string) => {
     if (!postme) {
       postme = new PostmeModel({
         chat: chat._id,
+        createdByUser: user._id,
       });
       isNewResource = true;
     }
@@ -113,12 +126,25 @@ export const getAvailableChatsForParsing = async (pageIndex: number) => {
   }
 };
 
-export const deleteSource = async (chatId: number): Promise<boolean> => {
+type DeleteSource = {
+  chatId: number;
+  isAdmin: boolean;
+  userId: number;
+};
+
+export const deleteSource = async (params: DeleteSource): Promise<boolean> => {
+  const { chatId, isAdmin, userId } = params;
   try {
     const resourceChat = await ChatModel.findOne({ chatId });
-    const postme = await PostmeModel.findOne({ chat: resourceChat });
+    const postme = await PostmeModel.findOne({ chat: resourceChat }).populate(
+      'createdByUser',
+    );
 
     if (!postme) return false;
+
+    if (postme.createdByUser?.userId !== userId && !isAdmin) {
+      return false;
+    }
 
     await UserModel.updateMany(
       { selectedPostme: postme._id },
@@ -167,13 +193,20 @@ export const setResourceToListening = async (
   }
 };
 
-interface GetContentProps {
+type GetContentProps = {
   chatId: number;
   userId: number;
-}
+};
+type ErrorMessage = {
+  message: string;
+  buttons?: InlineKeyboardMarkup;
+};
 
-export const getContent = async (props: GetContentProps) => {
+export const getContent = async (
+  props: GetContentProps,
+): Promise<ErrorMessage> => {
   const { chatId, userId } = props;
+  const errorMessage: ErrorMessage = { message: '' };
   try {
     let selectedContentType: ContentType = 'photo';
 
@@ -182,9 +215,24 @@ export const getContent = async (props: GetContentProps) => {
       { selectedPostme: 1, permissions: 1 },
     ).populate('selectedPostme');
 
-    if (!user) throw new Error('Пользователь не найден!');
-    if (!user.selectedPostme)
-      throw new Error('Сначала выберите доступный ресурс!');
+    if (!user) {
+      errorMessage.message = 'Пользователь не найден!';
+      return errorMessage;
+    }
+    if (!user.selectedPostme) {
+      errorMessage.message = 'Сначала выберите доступный ресурс!';
+      errorMessage.buttons = {
+        inline_keyboard: [
+          [
+            {
+              text: '📃 Открыть список доступных ресурсов',
+              callback_data: `${PostmeActions.SelectSource}:0`,
+            },
+          ],
+        ],
+      };
+      return errorMessage;
+    }
 
     const permissions = user.permissions
       .map((p) => p.split('.'))
@@ -216,8 +264,10 @@ export const getContent = async (props: GetContentProps) => {
         contentType: content.type,
       }),
     );
+    return errorMessage;
   } catch (error) {
     console.log(error);
-    return (error as Error).message;
+    errorMessage.message = (error as Error).message;
+    return errorMessage;
   }
 };
